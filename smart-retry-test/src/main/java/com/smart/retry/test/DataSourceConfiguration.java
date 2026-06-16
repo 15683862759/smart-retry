@@ -19,10 +19,11 @@ public class DataSourceConfiguration {
     @Bean
     public DataSource dataSource() throws SQLException {
         DruidDataSource dataSource = new DruidDataSource();
-        dataSource.setDriverClassName("com.mysql.jdbc.Driver");
+        // mysql-connector-java 8.x 驱动类
+        dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
         dataSource.setUsername("root");
-        dataSource.setPassword("123456789");
-        dataSource.setUrl("jdbc:mysql://127.0.0.1:3306/retry_task?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false");
+        dataSource.setPassword("root");
+        dataSource.setUrl("jdbc:mysql://127.0.0.1:3306/charging?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false");
         DruidPooledConnection connection = dataSource.getConnection();
         return dataSource;
     }

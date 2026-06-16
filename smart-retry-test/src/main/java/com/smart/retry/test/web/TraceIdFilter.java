@@ -1,5 +1,6 @@
 package com.smart.retry.test.web;
 
+
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -35,7 +36,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
     private static final String RESPONSE_HEADER = "X-Trace-Id";
 
     /** 同时写入 3 个 MDC key，便于兼容各种日志 pattern 与 trace 体系 */
-    private static final String[] MDC_KEYS = {"traceId", "TRACE_ID", "X-Trace-Id"};
+    private static final String[] MDC_KEYS = {"traceId"};
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,

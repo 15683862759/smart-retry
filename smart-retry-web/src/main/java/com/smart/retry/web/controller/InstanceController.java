@@ -6,7 +6,7 @@ import com.smart.retry.web.dto.instance.InstanceQueryRequest;
 import com.smart.retry.web.dto.instance.InstanceUpdateRequest;
 import com.smart.retry.web.dto.instance.InstanceVO;
 import com.smart.retry.web.service.InstanceService;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

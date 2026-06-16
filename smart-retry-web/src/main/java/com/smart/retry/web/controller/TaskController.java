@@ -4,7 +4,7 @@ import com.smart.retry.web.dto.PageResult;
 import com.smart.retry.web.dto.Result;
 import com.smart.retry.web.dto.task.*;
 import com.smart.retry.web.service.TaskService;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
