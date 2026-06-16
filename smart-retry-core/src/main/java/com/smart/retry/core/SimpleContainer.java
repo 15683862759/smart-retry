@@ -8,9 +8,11 @@ import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.common.innovation.SmartInnovation;
 import com.smart.retry.common.model.RetryTask;
 import com.smart.retry.common.utils.GsonTool;
+import com.smart.retry.common.utils.LogIdUtils;
 import com.smart.retry.core.config.SmartExecutorConfigure;
 import com.smart.retry.core.innovation.DefaultInnovation;
 import org.slf4j.Logger;
+import org.slf4j.MDC;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.util.CollectionUtils;
@@ -141,6 +143,14 @@ public class SimpleContainer implements RetryContainer {
         public void run() {
             String uniqueKey = getUniqueKey(retryTask);
 
+            // 仅记录执行前 traceId key 的原 value（用于 finally 中"业务线程原值还原"）
+            LogIdUtils.LogIdLookup beforeMdc = LogIdUtils.getCurrentLogIdAndKey();
+            String beforeKey = beforeMdc.isPresent() ? beforeMdc.getKey() : null;
+            String beforeValue = beforeMdc.isPresent() ? beforeMdc.getValue() : null;
+
+            // 把任务自带的 traceId 写回 MDC（精准还原当初那个 key，不污染其它 MDC key）
+            String restoreKey = LogIdUtils.restoreFromEncoded(retryTask.getCurrentLogId());
+
             try {
 
                 SmartInnovation innovation = new DefaultInnovation(retryTask, retryConfiguration);
@@ -148,6 +158,14 @@ public class SimpleContainer implements RetryContainer {
             } catch (Throwable e) {
                 LOGGER.error("[ConsumerTask-run error,retryTask:{} ", GsonTool.toJsonString(retryTask), e);
             } finally {
+                // 仅清理本任务写入的那一个 MDC key；优先还原业务方原值，否则 remove
+                if (restoreKey != null) {
+                    if (beforeKey != null && beforeKey.equals(restoreKey) && beforeValue != null) {
+                        MDC.put(restoreKey, beforeValue);
+                    } else {
+                        MDC.remove(restoreKey);
+                    }
+                }
                 RetryTaskCache.removeTaskFlag(uniqueKey);
             }
 

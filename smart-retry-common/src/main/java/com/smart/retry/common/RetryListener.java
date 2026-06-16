@@ -1,15 +1,13 @@
 package com.smart.retry.common;
 
 import com.smart.retry.common.constant.ExecuteResultStatus;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @Author xiaoqiang
- * @Version RetryLinstener.java, v 0.1 2025年02月14日 10:30 xiaoqiang
+ * @Version RetryListener.java, v 0.1 2025年02月14日 10:30 xiaoqiang
  * @Description: TODO
  */
-public interface RetryLinstener<T> {
+public interface RetryListener<T> {
 
 
 

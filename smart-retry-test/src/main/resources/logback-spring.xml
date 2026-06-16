@@ -7,7 +7,7 @@
     <property name="LOG_PATH" value="${user.home}/${APP_NAME}/logs"/>
     <property name="LOG_FILE" value="${LOG_PATH}/application.log"/>
     <property name="APP_FILE_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} ${LOG_LEVEL_PATTERN:-%5p} ${PID:- } --- [remoteIP:%X{REMOTE_IP},traceId:%X{TRACE_ID},rpcId:%X{RPC_ID},%X{EAGLEEYE_IS_TEST}] [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} ${LOG_LEVEL_PATTERN:-%5p} ${PID:- } --- [remoteIP:%X{REMOTE_IP},traceId:%X{traceId},rpcId:%X{rpcId}] [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
 
 
     <appender name="APPLICATION"

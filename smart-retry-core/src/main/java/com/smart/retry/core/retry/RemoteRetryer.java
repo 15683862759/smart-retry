@@ -9,6 +9,7 @@ import com.smart.retry.common.model.RetryTask;
 import com.smart.retry.common.retry.IRetryer;
 import com.smart.retry.common.serializer.SmartSerializer;
 import com.smart.retry.common.utils.IpUtils;
+import com.smart.retry.common.utils.LogIdUtils;
 import com.smart.retry.core.ShardingContextHolder;
 import org.aopalliance.intercept.MethodInvocation;
 import org.slf4j.Logger;
@@ -80,6 +81,13 @@ public class RemoteRetryer implements IRetryer {
 
         long firstNextExecuteTime = System.currentTimeMillis()+retryable.firstDelaySecond()*1000;
         retryTask.setNextPlanTime(new Date(firstNextExecuteTime));
+
+        // 把当前线程命中的 MDC traceId key + value 一起编码落到 current_log_id，
+        // 重试执行时按当初那个 key 精准还原，避免污染业务方线程其它 MDC key。
+        LogIdUtils.LogIdLookup lookup = LogIdUtils.getCurrentLogIdAndKey();
+        retryTask.setCurrentLogId(lookup.isPresent()
+                ? LogIdUtils.encode(lookup.getKey(), lookup.getValue())
+                : LogIdUtils.encode(null, LogIdUtils.getCurrentLogId()));
 
         retryConfiguration.getRetryTaskAcess().saveRetryTask(retryTask);
 

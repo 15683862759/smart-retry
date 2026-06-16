@@ -1,17 +1,14 @@
 package com.smart.retry.core.scanner;
 
-import com.smart.retry.common.RetryLinstener;
+import com.smart.retry.common.RetryListener;
 import com.smart.retry.common.annotation.RetryOnClass;
 import com.smart.retry.common.constant.RetryTaskTypeEnum;
 import com.smart.retry.common.model.RetryTaskObject;
 import com.smart.retry.common.scanner.RetryScanner;
 import com.smart.retry.core.cache.RetryCache;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.aop.support.AopUtils;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
 
@@ -33,10 +30,10 @@ public class RetryClassScanner implements RetryScanner {
     }
 
     private void resolveClassAnnotation(Object bean, ApplicationContext applicationContext) {
-        if (!(bean instanceof RetryLinstener)) {
+        if (!(bean instanceof RetryListener)) {
             return;
         }
-        if (bean.getClass() == RetryLinstener.class) {
+        if (bean.getClass() == RetryListener.class) {
             return;
         }
         RetryOnClass retryableOnClass = AnnotationUtils.findAnnotation(bean.getClass(), RetryOnClass.class);

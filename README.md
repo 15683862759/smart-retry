@@ -146,14 +146,14 @@ CREATE TABLE `retry_task` (
   `creator` varchar(64) DEFAULT NULL COMMENT '创建者(默认是IP)',
   `executor` varchar(64) DEFAULT NULL COMMENT '执行者',
   `origin_retry_num` int DEFAULT NULL COMMENT '存放任务原始的次数',
-  `current_log_id` bigint DEFAULT NULL COMMENT '当前运行日志id',
+  `current_log_id` varchar(128) DEFAULT NULL COMMENT '当前运行日志 ID（兼容 "key::value" 编码落库，重试时按 key 精准回填 MDC）',
   `unique_key` varchar(64) DEFAULT NULL COMMENT '唯一标识',
   `next_plan_time_strategy` int DEFAULT NULL,
   KEY `idx_next_plan_time` (`next_plan_time`),
   KEY `idx_status_sharding_key_next_plan_time_retry_num` (`status`,sharding_key,`next_plan_time`,`retry_num`),
   KEY `idx_gmt_create_sharding_key` (`gmt_create`,`sharding_key`),
   KEY `idx_unique_key` (`unique_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=1094 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='重试任务表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='重试任务表';
 
 ```
 

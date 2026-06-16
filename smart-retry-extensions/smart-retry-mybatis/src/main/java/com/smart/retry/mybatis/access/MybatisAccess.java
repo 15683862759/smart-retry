@@ -108,4 +108,9 @@ public class MybatisAccess implements RetryTaskAccess {
         return retryTaskRepo.deleteByGmtCreate(clearBeforeDate, limitRows);
 
     }
+
+    @Override
+    public int restartRetryTask(long taskId, int targetRetryNum, Date nextPlanTime) {
+        return retryTaskRepo.restartRetryTask(taskId, targetRetryNum, nextPlanTime);
+    }
 }

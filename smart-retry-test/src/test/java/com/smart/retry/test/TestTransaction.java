@@ -1,7 +1,7 @@
 package com.smart.retry.test;
 
 import com.alibaba.fastjson.JSONObject;
-import com.smart.retry.common.RetryLinstener;
+import com.smart.retry.common.RetryListener;
 import com.smart.retry.common.annotation.RetryOnClass;
 import com.smart.retry.common.constant.ExecuteResultStatus;
 
@@ -10,13 +10,12 @@ import com.smart.retry.common.constant.ExecuteResultStatus;
  * @Version TestTransaction.java, v 0.1 2026年02月06日 10:06 xiaoqiang
  * @Description: TODO
  */
-import com.smart.retry.common.RetryLinstener;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @RetryOnClass(taskCode = "TestTransaction", taskDesc = "测试事务")
-public class TestTransaction implements RetryLinstener<List<TestModel>> {
+public class TestTransaction implements RetryListener<List<TestModel>> {
 
     @Override
     @Transactional

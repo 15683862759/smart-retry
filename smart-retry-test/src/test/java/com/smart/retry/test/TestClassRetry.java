@@ -1,6 +1,6 @@
 package com.smart.retry.test;
 
-import com.smart.retry.common.RetryLinstener;
+import com.smart.retry.common.RetryListener;
 import com.smart.retry.common.annotation.RetryOnClass;
 import com.smart.retry.common.constant.ExecuteResultStatus;
 
@@ -11,7 +11,7 @@ import com.smart.retry.common.constant.ExecuteResultStatus;
  */
 
 @RetryOnClass(taskCode = "test_class_retry_task_code",retryTaskNotifies = {NotifyTest.class})
-public class TestClassRetry implements RetryLinstener<String> {
+public class TestClassRetry implements RetryListener<String> {
     @Override
     public ExecuteResultStatus consume(String param) {
 

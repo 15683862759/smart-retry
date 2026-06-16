@@ -1,11 +1,9 @@
 package com.smart.retry.test;
 
 import com.alibaba.fastjson.JSONObject;
-import com.smart.retry.common.RetryLinstener;
+import com.smart.retry.common.RetryListener;
 import com.smart.retry.common.annotation.RetryOnClass;
 import com.smart.retry.common.constant.ExecuteResultStatus;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * @Author xiaoqiang
@@ -13,7 +11,7 @@ import java.util.concurrent.TimeUnit;
  * @Description: TODO
  */
 @RetryOnClass(taskCode = "TestClassWithParam")
-public class TestClassWithParam implements RetryLinstener<TestModel> {
+public class TestClassWithParam implements RetryListener<TestModel> {
 
     @Override
     public ExecuteResultStatus consume(TestModel param) {

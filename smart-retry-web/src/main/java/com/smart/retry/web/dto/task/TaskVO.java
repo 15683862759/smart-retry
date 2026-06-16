@@ -48,7 +48,7 @@ public class TaskVO {
     
     private Integer originRetryNum;
     
-    private Long currentLogId;
+    private String currentLogId;
     
     private String uniqueKey;
     

@@ -39,4 +39,16 @@ public interface RetryTaskDao {
      * 批量删除任务
      */
     int batchDeleteByIds(@Param("ids") List<Long> ids);
+
+    /**
+     * 把失败的任务重置为待执行（status=0），保留原 {@code current_log_id} 现场。
+     *
+     * @param id              任务 ID
+     * @param targetRetryNum  重置后剩余可重试次数
+     * @param nextPlanTime    下次执行时间
+     * @return 受影响行数
+     */
+    int restartRetryTask(@Param("id") Long id,
+                         @Param("targetRetryNum") int targetRetryNum,
+                         @Param("nextPlanTime") Date nextPlanTime);
 }

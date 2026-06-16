@@ -20,7 +20,7 @@
         <result column="next_plan_time_strategy" javaType="INTEGER" property="nextPlanTimeStrategy"/>
         <result column="attribute" jdbcType="LONGVARCHAR" property="attribute"/>
         <result column="parameters" jdbcType="LONGVARCHAR" property="parameters"/>
-        <result column="current_log_id" jdbcType="BIGINT" property="currentLogId"/>
+        <result column="current_log_id" jdbcType="VARCHAR" property="currentLogId"/>
         <result column="unique_key" jdbcType="VARCHAR" property="uniqueKey"/>
     </resultMap>
     <sql id="base_columns">
@@ -135,7 +135,7 @@
                 #{intervalSecond,jdbcType=INTEGER},
                 #{delaySecond,jdbcType=INTEGER}, #{nextPlanTime,jdbcType=TIMESTAMP}, #{retryNum,jdbcType=INTEGER},
                 #{attribute,jdbcType=LONGVARCHAR}, #{parameters,jdbcType=LONGVARCHAR},
-                #{originRetryNum},  #{currentLogId}
+                #{originRetryNum},  #{currentLogId,jdbcType=VARCHAR}
                    , #{creator}, #{executor},#{nextPlanTimeStrategy},#{uniqueKey})
     </insert>
     <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
@@ -209,7 +209,7 @@
                 </if>
 
                 <if test="currentLogId != null">
-                    current_log_id = #{currentLogId},
+                    current_log_id = #{currentLogId,jdbcType=VARCHAR},
                 </if>
             </trim>
         </set>
@@ -288,5 +288,15 @@
             #{id}
         </foreach>
     </delete>
+
+    <!-- 重启任务：把失败任务重置为待执行，保留 current_log_id 不动 -->
+    <update id="restartRetryTask">
+        UPDATE retry_task
+        SET gmt_modified = CURRENT_TIMESTAMP,
+            status = 0,
+            retry_num = #{targetRetryNum},
+            next_plan_time = #{nextPlanTime}
+        WHERE id = #{id}
+    </update>
 
 </mapper>

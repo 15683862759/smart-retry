@@ -47,7 +47,7 @@ public class RetryTaskDO extends BaseEntity {
 
     private String executor;
 
-    private Long currentLogId;
+    private String currentLogId;
 
     private String uniqueKey;
 
@@ -173,11 +173,11 @@ public class RetryTaskDO extends BaseEntity {
         this.creator = creator;
     }
 
-    public Long getCurrentLogId() {
+    private String getCurrentLogId() {
         return currentLogId;
     }
 
-    public void setCurrentLogId(Long currentLogId) {
+    public void setCurrentLogId(String currentLogId) {
         this.currentLogId = currentLogId;
     }
 }

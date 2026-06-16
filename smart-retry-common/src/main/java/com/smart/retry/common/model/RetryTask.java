@@ -60,6 +60,13 @@ public class RetryTask extends BaseEntity{
 
     private String uniqueKey;
 
+    /**
+     * 当前运行 traceId。存储格式为 {@code key::value}（如 {@code traceId::abc123}），
+     * 由 {@link com.smart.retry.common.utils.LogIdUtils} 编码；
+     * 空字符串或 null 表示兼容历史数据（{@code BIGINT} 旧值）。
+     */
+    private String currentLogId;
+
 
     private Long shardingKey;
 
@@ -194,5 +201,25 @@ public class RetryTask extends BaseEntity{
 
     public void setAttribute(String attribute) {
         this.attribute = attribute;
+    }
+
+    /**
+     * 获取当前运行 traceId 编码，格式 {@code key::value}。
+     *
+     * @return 当前 traceId 编码，未设置时返回 null
+     */
+    public String getCurrentLogId() {
+        return currentLogId;
+    }
+
+    /**
+     * 设置当前运行 traceId 编码，格式 {@code key::value}。
+     * 建议通过 {@link com.smart.retry.common.utils.LogIdUtils#encode(String, String)}
+     * 生成，避免直接拼字符串。
+     *
+     * @param currentLogId 编码后的 traceId
+     */
+    public void setCurrentLogId(String currentLogId) {
+        this.currentLogId = currentLogId;
     }
 }

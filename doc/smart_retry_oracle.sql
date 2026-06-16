@@ -82,7 +82,7 @@ CREATE TABLE retry_task (
     creator                 VARCHAR2(64),
     executor                VARCHAR2(64),
     origin_retry_num        NUMBER(10),
-    current_log_id          NUMBER(20),
+    current_log_id          VARCHAR2(128),
     unique_key              VARCHAR2(64),
     next_plan_time_strategy NUMBER(10)
 );
@@ -120,7 +120,7 @@ COMMENT ON COLUMN retry_task.retry_num IS '重试次数';
 COMMENT ON COLUMN retry_task.creator IS '创建者(默认是IP)';
 COMMENT ON COLUMN retry_task.executor IS '执行者';
 COMMENT ON COLUMN retry_task.origin_retry_num IS '存放任务原始的次数';
-COMMENT ON COLUMN retry_task.current_log_id IS '当前运行日志id';
+COMMENT ON COLUMN retry_task.current_log_id IS '当前运行日志 ID（兼容 "key::value" 编码落库，重试时按 key 精准回填 MDC）';
 COMMENT ON COLUMN retry_task.unique_key IS '唯一标识';
 COMMENT ON COLUMN retry_task.next_plan_time_strategy IS '下次计划时间策略（对应 NextPlanTimeStrategyEnum 枚举）';
 

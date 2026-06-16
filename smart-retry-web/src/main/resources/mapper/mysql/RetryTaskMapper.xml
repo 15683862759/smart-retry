@@ -21,7 +21,7 @@
         <result column="next_plan_time_strategy" javaType="INTEGER" property="nextPlanTimeStrategy"/>
         <result column="attribute" jdbcType="LONGVARCHAR" property="attribute"/>
         <result column="parameters" jdbcType="LONGVARCHAR" property="parameters"/>
-        <result column="current_log_id" jdbcType="BIGINT" property="currentLogId"/>
+        <result column="current_log_id" jdbcType="VARCHAR" property="currentLogId"/>
         <result column="unique_key" jdbcType="VARCHAR" property="uniqueKey"/>
     </resultMap>
     
@@ -66,7 +66,7 @@
         VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, #{taskDesc}, #{shardingKey},
                 #{taskCode}, #{status}, #{intervalSecond}, #{delaySecond},
                 #{nextPlanTime}, #{retryNum}, #{attribute}, #{parameters},
-                #{originRetryNum}, #{currentLogId}, #{creator}, #{executor},
+                #{originRetryNum}, #{currentLogId,jdbcType=VARCHAR}, #{creator}, #{executor},
                 #{nextPlanTimeStrategy}, #{uniqueKey})
     </insert>
 

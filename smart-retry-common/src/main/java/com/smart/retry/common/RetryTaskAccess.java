@@ -62,4 +62,18 @@ public interface RetryTaskAccess {
 
     int  deleteHistoryRetryTask(int clearBeforeDays, int limitRows);
 
+    /**
+     * 后门能力：把失败任务重置为待执行（{@code status=0}），保留 originalRetryNum 与
+     * {@code currentLogId} 现场。仅当具体实现支持时生效（如 MyBatis 实现）。
+     *
+     * @param taskId          任务 ID
+     * @param targetRetryNum  重置后剩余可重试次数
+     * @param nextPlanTime    下次执行时间
+     * @return 受影响行数
+     * @throws UnsupportedOperationException 不支持该能力时抛出
+     */
+    default int restartRetryTask(long taskId, int targetRetryNum, java.util.Date nextPlanTime) {
+        throw new UnsupportedOperationException("current RetryTaskAccess does not support restartRetryTask");
+    }
+
 }

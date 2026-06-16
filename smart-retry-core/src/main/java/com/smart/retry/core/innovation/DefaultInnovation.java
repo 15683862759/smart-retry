@@ -1,8 +1,7 @@
 package com.smart.retry.core.innovation;
 
-import com.google.gson.reflect.TypeToken;
 import com.smart.retry.common.RetryConfiguration;
-import com.smart.retry.common.RetryLinstener;
+import com.smart.retry.common.RetryListener;
 import com.smart.retry.common.constant.ExecuteResultStatus;
 import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.common.constant.RetryTaskTypeEnum;
@@ -161,21 +160,21 @@ public class DefaultInnovation implements SmartInnovation {
 
     private ExecuteResultStatus invokeRetryLinstener(RetryTaskObject taskObject, Object args) throws Throwable {
 
-        RetryLinstener retryLinstener = (RetryLinstener) taskObject.getTargetObj();
+        RetryListener retryListener = (RetryListener) taskObject.getTargetObj();
         try {
 
-            retryLinstener.beforeConsume(args);
+            retryListener.beforeConsume(args);
         } catch (Exception ex) {
             LOGGER.error("retry-task listener beforeConsume {}", ex.getMessage(), ex);
         }
 
         ExecuteResultStatus consumeStatus = null;
         try {
-            consumeStatus = retryLinstener.consume(args);
+            consumeStatus = retryListener.consume(args);
             return consumeStatus;
         } finally {
             try {
-                retryLinstener.afterConsume(consumeStatus, args);
+                retryListener.afterConsume(consumeStatus, args);
             }catch (Exception ex){
                 LOGGER.error("retry-task listener afterConsume {}", ex.getMessage(), ex);
             }
@@ -201,7 +200,7 @@ public class DefaultInnovation implements SmartInnovation {
         for (Type genericInterface : clazz.getGenericInterfaces()) {
             if (genericInterface instanceof ParameterizedType) {
                 ParameterizedType pt = (ParameterizedType) genericInterface;
-                if (pt.getRawType() == RetryLinstener.class) {
+                if (pt.getRawType() == RetryListener.class) {
                     Type[] args = pt.getActualTypeArguments();
                     if (args.length > 0) {
                         Type targetType = args[0];

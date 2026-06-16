@@ -3,6 +3,7 @@ package com.smart.retry.mybatis.repo.impl;
 import com.google.common.collect.Lists;
 import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.common.utils.IpUtils;
+import com.smart.retry.common.utils.LogIdUtils;
 import com.smart.retry.core.ShardingContextHolder;
 import com.smart.retry.mybatis.dao.RetryTaskDao;
 import com.smart.retry.mybatis.entity.RetryTaskDO;
@@ -48,6 +49,13 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
         retryTask.setNextPlanTime(new Date(nextTime));
         retryTask.setOriginRetryNum(retryTask.getRetryNum());
         retryTask.setCreator(IpUtils.getIp());
+        // 若调用方未写入 traceId（如 RetryTaskBuilder 路径），在此兜底写一次
+        if (retryTask.getCurrentLogId() == null) {
+            LogIdUtils.LogIdLookup lookup = LogIdUtils.getCurrentLogIdAndKey();
+            retryTask.setCurrentLogId(lookup.isPresent()
+                    ? LogIdUtils.encode(lookup.getKey(), lookup.getValue())
+                    : LogIdUtils.encode(null, LogIdUtils.getCurrentLogId()));
+        }
         retryTaskDao.insert(retryTask);
         return retryTask.getId();
     }
@@ -128,5 +136,10 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
             }
         }
         return deleteCount;
+    }
+
+    @Override
+    public int restartRetryTask(long taskId, int targetRetryNum, Date nextPlanTime) {
+        return retryTaskDao.restartRetryTask(taskId, targetRetryNum, nextPlanTime);
     }
 }

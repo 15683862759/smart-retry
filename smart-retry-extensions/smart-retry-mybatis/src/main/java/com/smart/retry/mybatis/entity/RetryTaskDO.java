@@ -54,7 +54,10 @@ public class RetryTaskDO extends BaseEntity {
 
     private String executor;
 
-    private Long currentLogId;
+    /**
+     * 当前 traceId 编码，格式 {@code key::value}；兼容历史的 {@code BIGINT} 数据。
+     */
+    private String currentLogId;
 
     private String uniqueKey;
 
@@ -184,11 +187,11 @@ public class RetryTaskDO extends BaseEntity {
     }
 
 
-    public Long getCurrentLogId() {
+    public String getCurrentLogId() {
         return currentLogId;
     }
 
-    public void setCurrentLogId(Long currentLogId) {
+    public void setCurrentLogId(String currentLogId) {
         this.currentLogId = currentLogId;
     }
 }

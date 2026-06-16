@@ -32,4 +32,14 @@ public interface RetryTaskRepo {
 
 
     int deleteByGmtCreate(Date gmtCreate, int limitRows);
+
+    /**
+     * 把失败的任务重置为待执行（status=0），保留原 {@code current_log_id} 现场。
+     *
+     * @param taskId          任务 ID
+     * @param targetRetryNum  重置后剩余可重试次数
+     * @param nextPlanTime    下次执行时间
+     * @return 受影响行数
+     */
+    int restartRetryTask(long taskId, int targetRetryNum, Date nextPlanTime);
 }
