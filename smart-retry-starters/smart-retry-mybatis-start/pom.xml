@@ -87,6 +87,7 @@
                                     <excludes>
                                         <exclude>static/**</exclude>
                                         <exclude>smart-retry-ui/**</exclude>
+<!--                                        <exclude>mapper/**</exclude>-->
                                     </excludes>
                                 </filter>
                             </filters>

@@ -67,7 +67,8 @@ public class MybatisAutoConfiguration extends CommonConfiguration
         MapperScannerConfigurer scannerConfigurer = new MapperScannerConfigurer();
         //scannerConfigurer.setSqlSessionFactory(smartRetrySqlSessionFactory);
         scannerConfigurer.setSqlSessionFactoryBeanName("smartRetrySqlSessionFactory"); // 设置 SqlSessionFactoryBean 的名称
-        scannerConfigurer.setBasePackage("com.smart.retry.mybatis.dao"); // 设置你的 mapper 接口所在的包
+        // 同时扫描核心 starter 模块与 web 模块下的 DAO 接口。MyBatis 官方支持以分号分隔多个包路径。
+        scannerConfigurer.setBasePackage("com.smart.retry.mybatis.dao;com.smart.retry.web.dao");
         return scannerConfigurer;
     }
     @Bean("smartRetrySqlSessionFactory")
@@ -88,12 +89,20 @@ public class MybatisAutoConfiguration extends CommonConfiguration
 
         if (dbType.getResource() == null) {
             throw new IllegalArgumentException("Database type '" + dbType.getName() + "' is not supported. " +
-                    "Supported types: " + DatabaseType.MYSQL.getName() + ", " + 
+                    "Supported types: " + DatabaseType.MYSQL.getName() + ", " +
                     DatabaseType.POSTGRESQL.getName() + ", " + DatabaseType.ORACLE.getName());
         }
 
         Resource resource = resolver.getResource(dbType.getResource());
         sqlSessionFactoryBean.setConfigLocation(resource);
+
+        // 加载 web 模块下按数据库类型分类的 MyBatis Mapper XML
+        String mapperLocation = "classpath*:mapper/" + dbType.getCode() + "/**/*.xml";
+        Resource[] mapperResources = resolver.getResources(mapperLocation);
+        LOGGER.info("[MybatisAutoConfiguration#smartRetrySqlSessionFactory] Loaded {} mapper XML(s) from {}",
+                mapperResources.length, mapperLocation);
+        sqlSessionFactoryBean.setMapperLocations(mapperResources);
+
         return sqlSessionFactoryBean.getObject();
     }
 
