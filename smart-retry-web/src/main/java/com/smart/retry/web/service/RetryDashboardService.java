@@ -1,7 +1,7 @@
 package com.smart.retry.web.service;
 
-import com.smart.retry.web.dao.RetryShardingDao;
-import com.smart.retry.web.dao.RetryTaskDao;
+import com.smart.retry.web.dao.WebRetryShardingDao;
+import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.dto.dashboard.DashboardVO;
 import com.smart.retry.web.dto.dashboard.DeadLetterTrendVO;
 import com.smart.retry.web.dto.dashboard.InstanceHeartbeatVO;
@@ -20,10 +20,10 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DashboardService {
+public class RetryDashboardService {
     
-    private final RetryShardingDao retryShardingDao;
-    private final RetryTaskDao retryTaskDao;
+    private final WebRetryShardingDao webRetryShardingDao;
+    private final WebRetryTaskDao webRetryTaskDao;
     
     /**
      * 获取仪表盘监控数据
@@ -32,10 +32,10 @@ public class DashboardService {
         DashboardVO dashboard = new DashboardVO();
         
         // 1. 活跃实例数量
-        dashboard.setActiveInstanceCount(retryShardingDao.countActiveInstances(10));
+        dashboard.setActiveInstanceCount(webRetryShardingDao.countActiveInstances(10));
         
         // 2. 分片分布情况
-        List<Map<String, Object>> shardingDist = retryShardingDao.getShardingDistribution();
+        List<Map<String, Object>> shardingDist = webRetryShardingDao.getShardingDistribution();
         Map<String, Integer> shardingMap = new HashMap<>();
         for (Map<String, Object> item : shardingDist) {
             String instanceId = (String) item.get("instanceId");
@@ -45,7 +45,7 @@ public class DashboardService {
         dashboard.setShardingDistribution(shardingMap);
         
         // 3. 实例心跳信息
-        List<Map<String, Object>> heartbeats = retryShardingDao.getInstanceHeartbeats();
+        List<Map<String, Object>> heartbeats = webRetryShardingDao.getInstanceHeartbeats();
         List<InstanceHeartbeatVO> heartbeatList = new ArrayList<>();
         for (Map<String, Object> item : heartbeats) {
             InstanceHeartbeatVO vo = new InstanceHeartbeatVO();
@@ -67,7 +67,7 @@ public class DashboardService {
         dashboard.setInstanceHeartbeats(heartbeatList);
         
         // 4. 任务状态分布
-        List<Map<String, Object>> statusDist = retryTaskDao.countTaskStatusDistribution();
+        List<Map<String, Object>> statusDist = webRetryTaskDao.countTaskStatusDistribution();
         Map<Integer, Long> statusMap = new HashMap<>();
         for (Map<String, Object> item : statusDist) {
             Number status = (Number) item.get("status");
@@ -78,7 +78,7 @@ public class DashboardService {
         dashboard.setTaskStatusDistribution(statusMap);
         
         // 5. 各任务类型积压量
-        List<Map<String, Object>> backlogByType = retryTaskDao.countTaskBacklogByType();
+        List<Map<String, Object>> backlogByType = webRetryTaskDao.countTaskBacklogByType();
         Map<String, Long> backlogMap = new HashMap<>();
         for (Map<String, Object> item : backlogByType) {
             String taskCode = (String) item.get("taskCode");
@@ -88,7 +88,7 @@ public class DashboardService {
         dashboard.setTaskBacklogByType(backlogMap);
         
         // 6. 死信任务趋势
-        List<Map<String, Object>> deadLetterData = retryTaskDao.getDeadLetterTrend(24);
+        List<Map<String, Object>> deadLetterData = webRetryTaskDao.getDeadLetterTrend(24);
         List<DeadLetterTrendVO> trendList = new ArrayList<>();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         for (Map<String, Object> item : deadLetterData) {
@@ -108,7 +108,7 @@ public class DashboardService {
         dashboard.setDeadLetterTrend(trendList);
         
         // 7. 任务处理速率
-        Double rate = retryTaskDao.getTaskProcessRate(5);
+        Double rate = webRetryTaskDao.getTaskProcessRate(5);
         dashboard.setTaskProcessRate(rate != null ? rate : 0.0);
         
         return dashboard;

@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  * 将所有非API请求转发到 index.html，由Vue Router处理
  */
 @Controller
-public class ForwardController {
+public class RetryForwardController {
     
     /**
      * 将所有非API、非静态资源的请求转发到 index.html

@@ -20,7 +20,7 @@
     </modules>
 
     <properties>
-        <smart.retry.version>1.0.1</smart.retry.version>
+        <smart.retry.version>1.0.0-SNAPSHOT</smart.retry.version>
         <maven.compiler.target>8</maven.compiler.target>
         <maven.compiler.source>8</maven.compiler.source>
         <java.version>8</java.version>
@@ -112,6 +112,11 @@
             </dependency>
             <dependency>
                 <groupId>com.smart.retry</groupId>
+                <artifactId>smart-retry-web</artifactId>
+                <version>${smart.retry.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.smart.retry</groupId>
                 <artifactId>smart-retry-starters</artifactId>
                 <version>${smart.retry.version}</version>
             </dependency>
@@ -124,30 +129,6 @@
             <dependency>
                 <groupId>com.caucho</groupId>
                 <artifactId>hessian</artifactId>
-                <version>4.0.60</version>
-                <scope>provided</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-lang3</artifactId>
-                <version>3.11</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>fastjson</artifactId>
-                <version>${fastjson.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-collections4</artifactId>
-                <version>4.4</version>
-            </dependency>
-            <dependency>
-                <groupId>com.caucho</groupId>
-                <artifactId>hessian</artifactId>
                 <version>${hessian.version}</version>
             </dependency>
             <dependency>
@@ -155,6 +136,12 @@
                 <artifactId>gson</artifactId>
                 <version>${gson.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>fastjson</artifactId>
+                <version>${fastjson.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.mybatis</groupId>
                 <artifactId>mybatis</artifactId>

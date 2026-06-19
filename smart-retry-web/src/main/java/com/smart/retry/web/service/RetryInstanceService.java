@@ -1,7 +1,7 @@
 package com.smart.retry.web.service;
 
-import com.smart.retry.web.dao.RetryShardingDao;
-import com.smart.retry.web.dao.RetryTaskDao;
+import com.smart.retry.web.dao.WebRetryShardingDao;
+import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.entity.RetryShardingDO;
 import com.smart.retry.web.dto.PageResult;
 import com.smart.retry.web.dto.instance.InstanceQueryRequest;
@@ -23,27 +23,27 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
-public class InstanceService {
+public class RetryInstanceService {
 
 
-    private static final Logger log = LoggerFactory.getLogger(InstanceService.class);
+    private static final Logger log = LoggerFactory.getLogger(RetryInstanceService.class);
     
-    private final RetryShardingDao retryShardingDao;
-    private final RetryTaskDao retryTaskDao;
+    private final WebRetryShardingDao webRetryShardingDao;
+    private final WebRetryTaskDao webRetryTaskDao;
     
     /**
      * 分页查询实例列表
      */
     public PageResult<InstanceVO> queryInstances(InstanceQueryRequest request) {
         // 查询总数
-        long total = retryShardingDao.countAll(request.getCreatorId(), request.getInstanceId());
+        long total = webRetryShardingDao.countAll(request.getCreatorId(), request.getInstanceId());
         
         if (total == 0) {
             return new PageResult<>(new ArrayList<>(), 0L, request.getPageNum(), request.getPageSize());
         }
         
         // 查询列表
-        List<RetryShardingDO> doList = retryShardingDao.selectAllWithPage(
+        List<RetryShardingDO> doList = webRetryShardingDao.selectAllWithPage(
                 request.getOffset(), 
                 request.getPageSize(),
                 request.getCreatorId(),
@@ -70,7 +70,7 @@ public class InstanceService {
             throw new BusinessException(400, "instanceId必须是ip:port格式，例如：192.168.1.100:8080");
         }
         
-        int result = retryShardingDao.updateInstanceId(request.getId(), request.getInstanceId());
+        int result = webRetryShardingDao.updateInstanceId(request.getId(), request.getInstanceId());
         if (result == 0) {
             throw new BusinessException("更新失败，实例不存在");
         }
@@ -84,14 +84,14 @@ public class InstanceService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteInstance(Long id) {
         // 查询分片信息
-        RetryShardingDO shardingDO = retryShardingDao.selectById(id);
+        RetryShardingDO shardingDO = webRetryShardingDao.selectById(id);
         if (shardingDO == null) {
             throw new BusinessException("实例不存在");
         }
             
         // 校验当前实例下是否存在不能删除的任务
         // 包括：待执行(0)、执行中(1)、失败但重试次数大于0的任务
-        int undeletableCount = retryTaskDao.countUndeletableTasksByShardingKey(shardingDO.getId());
+        int undeletableCount = webRetryTaskDao.countUndeletableTasksByShardingKey(shardingDO.getId());
         if (undeletableCount > 0) {
             throw new BusinessException(
                 String.format("该实例下存在%d个待执行、执行中或可重试的任务，无法删除。请先处理相关任务。", undeletableCount)
@@ -105,7 +105,7 @@ public class InstanceService {
         //log.info("[InstanceService#deleteInstance]删除实例下的所有任务成功，id: {}, instanceId: {}", id, shardingDO.getInstanceId());
             
         // 删除实例
-        int result = retryShardingDao.deleteById(id);
+        int result = webRetryShardingDao.deleteById(id);
         if (result == 0) {
             throw new BusinessException("删除实例失败");
         }

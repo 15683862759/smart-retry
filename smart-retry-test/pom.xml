@@ -74,18 +74,18 @@
             <artifactId>mysql-connector-java</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>com.smart.retry</groupId>
-            <artifactId>smart-retry-common</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.smart.retry</groupId>
-            <artifactId>smart-retry-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.smart.retry</groupId>
-            <artifactId>smart-retry-mybatis</artifactId>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.smart.retry</groupId>-->
+<!--            <artifactId>smart-retry-common</artifactId>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>com.smart.retry</groupId>-->
+<!--            <artifactId>smart-retry-core</artifactId>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>com.smart.retry</groupId>-->
+<!--            <artifactId>smart-retry-mybatis</artifactId>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>org.slf4j</groupId>

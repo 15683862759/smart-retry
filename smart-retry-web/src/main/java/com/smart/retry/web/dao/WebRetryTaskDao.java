@@ -4,14 +4,13 @@ import com.smart.retry.web.entity.RetryTaskDO;
 import com.smart.retry.web.entity.query.RetryTaskQuery;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 重试任务DAO（管理模块专用）
  */
-public interface RetryTaskDao {
+public interface WebRetryTaskDao {
 
     /**
      * 插入任务

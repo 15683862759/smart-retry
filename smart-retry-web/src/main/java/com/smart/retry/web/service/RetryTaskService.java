@@ -3,8 +3,8 @@ package com.smart.retry.web.service;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.smart.retry.common.constant.RetryTaskStatus;
-import com.smart.retry.web.dao.RetryShardingDao;
-import com.smart.retry.web.dao.RetryTaskDao;
+import com.smart.retry.web.dao.WebRetryShardingDao;
+import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.entity.RetryShardingDO;
 import com.smart.retry.web.entity.RetryTaskDO;
 import com.smart.retry.web.entity.query.RetryTaskQuery;
@@ -23,12 +23,12 @@ import java.util.*;
  */
 @Service
 @RequiredArgsConstructor
-public class TaskService {
+public class RetryTaskService {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TaskService.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RetryTaskService.class);
     
-    private final RetryTaskDao retryTaskDao;
-    private final RetryShardingDao retryShardingDao;
+    private final WebRetryTaskDao webRetryTaskDao;
+    private final WebRetryShardingDao webRetryShardingDao;
     
     private static final Gson GSON = new Gson();
     
@@ -49,21 +49,21 @@ public class TaskService {
         query.setMaxGmtCreate(request.getGmtCreateEnd());
         
         // 查询总数
-        int total = retryTaskDao.countByQuery(query);
+        int total = webRetryTaskDao.countByQuery(query);
         
         if (total == 0) {
             return new PageResult<>(new ArrayList<>(), 0L, request.getPageNum(), request.getPageSize());
         }
         
         // 查询列表
-        List<RetryTaskDO> doList = retryTaskDao.selectByQuery(query);
+        List<RetryTaskDO> doList = webRetryTaskDao.selectByQuery(query);
         
         // 批量查询分片信息，避免 N+1 查询
         Map<Long, RetryShardingDO> shardingMap = new HashMap<>();
         for (RetryTaskDO taskDO : doList) {
             long shardingKey = taskDO.getShardingKey();
             if (!shardingMap.containsKey(shardingKey)) {
-                RetryShardingDO sharding = retryShardingDao.selectById(shardingKey);
+                RetryShardingDO sharding = webRetryShardingDao.selectById(shardingKey);
                 if (sharding != null) {
                     shardingMap.put(shardingKey, sharding);
                 }
@@ -118,7 +118,7 @@ public class TaskService {
         taskDO.setNextPlanTime(calendar.getTime());
         
         // 插入数据库
-        retryTaskDao.insert(taskDO);
+        webRetryTaskDao.insert(taskDO);
         
         log.info("[TaskService#createTask]创建任务成功，id: {}, taskCode: {}", taskDO.getId(), taskDO.getTaskCode());
         return taskDO.getId();
@@ -130,7 +130,7 @@ public class TaskService {
     @Transactional(rollbackFor = Exception.class)
     public void updateTask(TaskUpdateRequest request) {
         // 查询当前任务
-        RetryTaskDO taskDO = retryTaskDao.selectById(request.getId());
+        RetryTaskDO taskDO = webRetryTaskDao.selectById(request.getId());
         if (taskDO == null) {
             throw new RuntimeException("任务不存在");
         }
@@ -177,12 +177,12 @@ public class TaskService {
         }
         
         // 再次检查任务状态（防止并发问题）
-        RetryTaskDO currentTask = retryTaskDao.selectById(request.getId());
+        RetryTaskDO currentTask = webRetryTaskDao.selectById(request.getId());
         if (RetryTaskStatus.RUNNING.getCode().equals(currentTask.getStatus())) {
             throw new RuntimeException("任务正在执行中，无法保存");
         }
         
-        retryTaskDao.update(taskDO);
+        webRetryTaskDao.update(taskDO);
         log.info("[TaskService#updateTask]更新任务成功，id: {}", request.getId());
     }
     
@@ -191,7 +191,7 @@ public class TaskService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteTask(Long id) {
-        RetryTaskDO taskDO = retryTaskDao.selectById(id);
+        RetryTaskDO taskDO = webRetryTaskDao.selectById(id);
         if (taskDO == null) {
             throw new RuntimeException("任务不存在");
         }
@@ -201,7 +201,7 @@ public class TaskService {
             throw new RuntimeException("执行中的任务无法删除");
         }
         
-        retryTaskDao.deleteById(id);
+        webRetryTaskDao.deleteById(id);
         log.info("[TaskService#deleteTask]删除任务成功，id: {}", id);
     }
     
@@ -216,13 +216,13 @@ public class TaskService {
         
         // 检查是否有执行中的任务
         for (Long id : ids) {
-            RetryTaskDO taskDO = retryTaskDao.selectById(id);
+            RetryTaskDO taskDO = webRetryTaskDao.selectById(id);
             if (taskDO != null && RetryTaskStatus.RUNNING.getCode().equals(taskDO.getStatus())) {
                 throw new RuntimeException("任务ID " + id + " 正在执行中，无法删除");
             }
         }
         
-        retryTaskDao.batchDeleteByIds(ids);
+        webRetryTaskDao.batchDeleteByIds(ids);
         log.info("[TaskService#batchDeleteTasks]批量删除任务成功，数量: {}", ids.size());
     }
     
@@ -231,7 +231,7 @@ public class TaskService {
      */
     public List<ShardingOptionVO> getShardingOptions() {
         // 查询所有分片
-        List<RetryShardingDO> shardingList = retryShardingDao.selectAllWithPage(0, 1000, null, null);
+        List<RetryShardingDO> shardingList = webRetryShardingDao.selectAllWithPage(0, 1000, null, null);
         
         // 按instanceId分组，每个instanceId取id最小的shardingKey
         Map<String, RetryShardingDO> instanceMap = new HashMap<>();

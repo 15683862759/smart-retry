@@ -5,7 +5,7 @@ import com.smart.retry.web.dto.Result;
 import com.smart.retry.web.dto.instance.InstanceQueryRequest;
 import com.smart.retry.web.dto.instance.InstanceUpdateRequest;
 import com.smart.retry.web.dto.instance.InstanceVO;
-import com.smart.retry.web.service.InstanceService;
+import com.smart.retry.web.service.RetryInstanceService;
 import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -16,16 +16,16 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/instance")
 @RequiredArgsConstructor
-public class InstanceController {
+public class RetryInstanceController {
     
-    private final InstanceService instanceService;
+    private final RetryInstanceService retryInstanceService;
     
     /**
      * 分页查询实例列表
      */
     @PostMapping("/query")
     public Result<PageResult<InstanceVO>> queryInstances(@RequestBody InstanceQueryRequest request) {
-        PageResult<InstanceVO> result = instanceService.queryInstances(request);
+        PageResult<InstanceVO> result = retryInstanceService.queryInstances(request);
         return Result.success(result);
     }
     
@@ -34,7 +34,7 @@ public class InstanceController {
      */
     @PutMapping("/update")
     public Result<Void> updateInstance(@Valid @RequestBody InstanceUpdateRequest request) {
-        instanceService.updateInstance(request);
+        retryInstanceService.updateInstance(request);
         return Result.success();
     }
     
@@ -43,7 +43,7 @@ public class InstanceController {
      */
     @DeleteMapping("/delete/{id}")
     public Result<Void> deleteInstance(@PathVariable("id") Long id) {
-        instanceService.deleteInstance(id);
+        retryInstanceService.deleteInstance(id);
         return Result.success();
     }
 }

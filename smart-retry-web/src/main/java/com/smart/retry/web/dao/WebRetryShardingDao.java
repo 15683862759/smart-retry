@@ -3,14 +3,13 @@ package com.smart.retry.web.dao;
 import com.smart.retry.web.entity.RetryShardingDO;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 重试分片DAO（管理模块专用）
  */
-public interface RetryShardingDao {
+public interface WebRetryShardingDao {
 
     /**
      * 查询所有分片数据（分页）

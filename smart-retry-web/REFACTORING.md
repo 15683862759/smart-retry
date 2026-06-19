@@ -58,14 +58,14 @@ mybatis:
 
 #### Service层
 所有Service类的import语句已更新：
+
 ```java
 // 修改前
+
 import com.smart.retry.mybatis.dao.RetryShardingDao;
 import com.smart.retry.mybatis.entity.RetryShardingDO;
 
 // 修改后
-import com.smart.retry.web.dao.RetryShardingDao;
-import com.smart.retry.web.entity.RetryShardingDO;
 ```
 
 涉及的文件：

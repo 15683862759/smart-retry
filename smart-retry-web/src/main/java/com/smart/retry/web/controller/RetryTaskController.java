@@ -3,7 +3,7 @@ package com.smart.retry.web.controller;
 import com.smart.retry.web.dto.PageResult;
 import com.smart.retry.web.dto.Result;
 import com.smart.retry.web.dto.task.*;
-import com.smart.retry.web.service.TaskService;
+import com.smart.retry.web.service.RetryTaskService;
 import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -16,16 +16,16 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/task")
 @RequiredArgsConstructor
-public class TaskController {
+public class RetryTaskController {
     
-    private final TaskService taskService;
+    private final RetryTaskService retryTaskService;
     
     /**
      * 分页查询任务列表
      */
     @PostMapping("/query")
     public Result<PageResult<TaskVO>> queryTasks(@RequestBody TaskQueryRequest request) {
-        PageResult<TaskVO> result = taskService.queryTasks(request);
+        PageResult<TaskVO> result = retryTaskService.queryTasks(request);
         return Result.success(result);
     }
     
@@ -34,7 +34,7 @@ public class TaskController {
      */
     @PostMapping("/create")
     public Result<Long> createTask(@Valid @RequestBody TaskCreateRequest request) {
-        Long taskId = taskService.createTask(request);
+        Long taskId = retryTaskService.createTask(request);
         return Result.success(taskId);
     }
     
@@ -43,7 +43,7 @@ public class TaskController {
      */
     @PutMapping("/update")
     public Result<Void> updateTask(@Valid @RequestBody TaskUpdateRequest request) {
-        taskService.updateTask(request);
+        retryTaskService.updateTask(request);
         return Result.success();
     }
     
@@ -52,7 +52,7 @@ public class TaskController {
      */
     @DeleteMapping("/delete/{id}")
     public Result<Void> deleteTask(@PathVariable("id") Long id) {
-        taskService.deleteTask(id);
+        retryTaskService.deleteTask(id);
         return Result.success();
     }
     
@@ -61,7 +61,7 @@ public class TaskController {
      */
     @DeleteMapping("/batch-delete")
     public Result<Void> batchDeleteTasks(@RequestBody List<Long> ids) {
-        taskService.batchDeleteTasks(ids);
+        retryTaskService.batchDeleteTasks(ids);
         return Result.success();
     }
     
@@ -70,7 +70,7 @@ public class TaskController {
      */
     @GetMapping("/sharding-options")
     public Result<List<ShardingOptionVO>> getShardingOptions() {
-        List<ShardingOptionVO> options = taskService.getShardingOptions();
+        List<ShardingOptionVO> options = retryTaskService.getShardingOptions();
         return Result.success(options);
     }
 }
