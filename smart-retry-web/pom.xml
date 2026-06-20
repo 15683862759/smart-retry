@@ -89,6 +89,7 @@
                     <exclude>smart-retry-ui/**</exclude>
                     <!-- 排除配置文件，单独打包web模块需放开 -->
                     <exclude>application.yml</exclude>
+                    <exclude>logback-spring.xml</exclude>
                 </excludes>
             </resource>
         </resources>
