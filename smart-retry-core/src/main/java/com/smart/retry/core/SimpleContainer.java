@@ -321,6 +321,7 @@ public class SimpleContainer implements RetryContainer {
                     }
                 }
                 RetryTaskCache.removeTaskFlag(uniqueKey);
+                afterExecute(retryTask);
             }
 
         }
