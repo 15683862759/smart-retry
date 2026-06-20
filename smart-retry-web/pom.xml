@@ -87,6 +87,8 @@
                 <excludes>
                     <!-- 排除前端源码目录，只包含打包后的static目录 -->
                     <exclude>smart-retry-ui/**</exclude>
+                    <!-- 排除配置文件，单独打包web模块需放开 -->
+                    <exclude>application.yml</exclude>
                 </excludes>
             </resource>
         </resources>
