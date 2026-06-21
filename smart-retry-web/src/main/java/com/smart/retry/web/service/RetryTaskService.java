@@ -3,6 +3,8 @@ package com.smart.retry.web.service;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.smart.retry.common.constant.RetryTaskStatus;
+import com.smart.retry.common.identifier.Identifier;
+import com.smart.retry.common.serializer.SmartSerializer;
 import com.smart.retry.web.dao.WebRetryShardingDao;
 import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.entity.RetryShardingDO;
@@ -12,11 +14,13 @@ import com.smart.retry.web.dto.PageResult;
 import com.smart.retry.web.dto.task.*;
 import com.smart.retry.web.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.text.ParseException;
 import java.util.*;
 
@@ -112,8 +116,9 @@ public class RetryTaskService {
         taskDO.setShardingKey(request.getShardingKey());
         taskDO.setNextPlanTimeStrategy(request.getNextPlanTimeStrategy());
         taskDO.setStatus(RetryTaskStatus.WAITING.getCode());
+        taskDO.setUniqueKey(DigestUtils.md5Hex( taskDO.getTaskCode() +":"+ taskDO.getParameters()));
         taskDO.setCreator("custom"); // 默认人为创建
-        
+
         // 计算下次执行时间：当前时间 + delaySecond
         Calendar calendar = Calendar.getInstance();
         calendar.add(Calendar.SECOND, request.getDelaySecond());
