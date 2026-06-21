@@ -12,10 +12,12 @@ import com.smart.retry.web.dto.PageResult;
 import com.smart.retry.web.dto.task.*;
 import com.smart.retry.web.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.time.DateUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.ParseException;
 import java.util.*;
 
 /**
@@ -128,7 +130,7 @@ public class RetryTaskService {
      * 更新任务
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateTask(TaskUpdateRequest request) {
+    public void updateTask(TaskUpdateRequest request) throws ParseException {
         // 查询当前任务
         RetryTaskDO taskDO = webRetryTaskDao.selectById(request.getId());
         if (taskDO == null) {
@@ -142,7 +144,7 @@ public class RetryTaskService {
         
         // 只允许编辑 nextPlanTime, retryNum, param, status
         if (request.getNextPlanTime() != null) {
-            taskDO.setNextPlanTime(request.getNextPlanTime());
+            taskDO.setNextPlanTime(DateUtils.parseDate(request.getNextPlanTime(),"YYYY-MM-dd HH:mm:ss"));
         }
         
         if (request.getRetryNum() != null) {

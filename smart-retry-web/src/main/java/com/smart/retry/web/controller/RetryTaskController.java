@@ -8,6 +8,7 @@ import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.text.ParseException;
 import java.util.List;
 
 /**
@@ -42,7 +43,7 @@ public class RetryTaskController {
      * 更新任务
      */
     @PutMapping("/update")
-    public Result<Void> updateTask(@Valid @RequestBody TaskUpdateRequest request) {
+    public Result<Void> updateTask(@Valid @RequestBody TaskUpdateRequest request) throws ParseException {
         retryTaskService.updateTask(request);
         return Result.success();
     }

@@ -12,7 +12,7 @@ public class TaskUpdateRequest {
     @NotNull(message = "id不能为空")
     private Long id;
     
-    private java.util.Date nextPlanTime;
+    private String nextPlanTime;
     
     private Integer retryNum;
     
