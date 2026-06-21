@@ -149,7 +149,7 @@ public class DefaultInnovation implements SmartInnovation {
             Object[] args = new Object[1];
             args[0] = parameterValue;
 
-            return invokeRetryLinstener(taskObject, args[0]);
+            return invokeRetryListener(retryTask, taskObject, args[0]);
         }
         if (retryTaskTypeEnum == RetryTaskTypeEnum.METHOD) {
             Object[] args = retryConfiguration.getSmartSerializer().deSerializer(method, retryTask.getParameters());
@@ -158,12 +158,12 @@ public class DefaultInnovation implements SmartInnovation {
         throw new RetryException("retryTaskTypeEnum is not support");
     }
 
-    private ExecuteResultStatus invokeRetryLinstener(RetryTaskObject taskObject, Object args) throws Throwable {
+    private ExecuteResultStatus invokeRetryListener(RetryTask retryTask, RetryTaskObject taskObject, Object args) throws Throwable {
 
         RetryListener retryListener = (RetryListener) taskObject.getTargetObj();
         try {
 
-            retryListener.beforeConsume(args);
+            retryListener.beforeConsume(retryTask, args);
         } catch (Exception ex) {
             LOGGER.error("retry-task listener beforeConsume {}", ex.getMessage(), ex);
         }
@@ -174,8 +174,8 @@ public class DefaultInnovation implements SmartInnovation {
             return consumeStatus;
         } finally {
             try {
-                retryListener.afterConsume(consumeStatus, args);
-            }catch (Exception ex){
+                retryListener.afterConsume(retryTask, consumeStatus, args);
+            } catch (Exception ex) {
                 LOGGER.error("retry-task listener afterConsume {}", ex.getMessage(), ex);
             }
         }
@@ -184,6 +184,7 @@ public class DefaultInnovation implements SmartInnovation {
 
     /**
      * 获取真实的参数类型
+     *
      * @param taskObject
      * @return
      */
