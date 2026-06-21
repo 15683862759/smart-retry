@@ -139,12 +139,12 @@ public class RetryTaskService {
         // 查询当前任务
         RetryTaskDO taskDO = webRetryTaskDao.selectById(request.getId());
         if (taskDO == null) {
-            throw new RuntimeException("任务不存在");
+            throw new BusinessException("任务不存在");
         }
-        
+
         // 检查任务状态，执行中的任务不能编辑
         if (RetryTaskStatus.RUNNING.getCode().equals(taskDO.getStatus())) {
-            throw new RuntimeException("执行中的任务无法编辑");
+            throw new BusinessException("执行中的任务无法编辑");
         }
         
         // 只允许编辑 nextPlanTime, retryNum, param, status
@@ -169,14 +169,14 @@ public class RetryTaskService {
             
             // 执行中状态不能被设置
             if (RetryTaskStatus.RUNNING.getCode().equals(newStatus)) {
-                throw new RuntimeException("不能将任务状态设置为执行中");
+                throw new BusinessException("不能将任务状态设置为执行中");
             }
             
             // 只有失败或成功的任务可以重置为待执行
             if (RetryTaskStatus.WAITING.getCode().equals(newStatus)) {
                 if (!RetryTaskStatus.FAIL.getCode().equals(currentStatus) 
                     && !RetryTaskStatus.SUCCESS.getCode().equals(currentStatus)) {
-                    throw new RuntimeException("只有失败或成功的任务才能重置为待执行");
+                    throw new BusinessException("只有失败或成功的任务才能重置为待执行");
                 }
             }
             
@@ -186,7 +186,7 @@ public class RetryTaskService {
         // 再次检查任务状态（防止并发问题）
         RetryTaskDO currentTask = webRetryTaskDao.selectById(request.getId());
         if (RetryTaskStatus.RUNNING.getCode().equals(currentTask.getStatus())) {
-            throw new RuntimeException("任务正在执行中，无法保存");
+            throw new BusinessException("任务正在执行中，无法保存");
         }
         
         webRetryTaskDao.update(taskDO);
@@ -200,12 +200,12 @@ public class RetryTaskService {
     public void deleteTask(Long id) {
         RetryTaskDO taskDO = webRetryTaskDao.selectById(id);
         if (taskDO == null) {
-            throw new RuntimeException("任务不存在");
+            throw new BusinessException("任务不存在");
         }
         
         // 执行中的任务不能删除
         if (RetryTaskStatus.RUNNING.getCode().equals(taskDO.getStatus())) {
-            throw new RuntimeException("执行中的任务无法删除");
+            throw new BusinessException("执行中的任务无法删除");
         }
         
         webRetryTaskDao.deleteById(id);
@@ -225,7 +225,7 @@ public class RetryTaskService {
         for (Long id : ids) {
             RetryTaskDO taskDO = webRetryTaskDao.selectById(id);
             if (taskDO != null && RetryTaskStatus.RUNNING.getCode().equals(taskDO.getStatus())) {
-                throw new RuntimeException("任务ID " + id + " 正在执行中，无法删除");
+                throw new BusinessException("任务ID " + id + " 正在执行中，无法删除");
             }
         }
         
