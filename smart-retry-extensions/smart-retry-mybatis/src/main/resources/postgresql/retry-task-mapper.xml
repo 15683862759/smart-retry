@@ -72,9 +72,6 @@
             <if test="intervalSecond != null">
                 AND interval_second=#{intervalSecond}
             </if>
-            <if test="delayTime != null">
-                AND delay_time=#{delayTime}
-            </if>
             <if test="nextPlanTime != null">
                 AND next_plan_time=#{nextPlanTime}
             </if>

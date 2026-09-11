@@ -447,7 +447,7 @@ public class SimpleContainer implements RetryContainer {
         public void run() {
 
             while (true) {
-                if (SmartRetryExit.isExit()) {
+                if (!SmartRetryExit.isExit()) {
                     return;
                 }
                 try {

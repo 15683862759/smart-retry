@@ -119,12 +119,7 @@ public class DefaultInnovation implements SmartInnovation {
                 executeResultStatus = ExecuteResultStatus.SUCCESS;
             }
             if (result != null && !(result instanceof ExecuteResultStatus)) {
-                if (retryTaskTypeEnum == RetryTaskTypeEnum.CLASS) {
-                    executeResultStatus = ExecuteResultStatus.SUCCESS;
-                }
-                if (retryTaskTypeEnum == RetryTaskTypeEnum.METHOD && result instanceof RetryTaskTypeEnum) {
-                    executeResultStatus = ExecuteResultStatus.SUCCESS;
-                }
+                executeResultStatus = ExecuteResultStatus.SUCCESS;
             }
             if (result != null && (result instanceof ExecuteResultStatus)) {
                 executeResultStatus = (ExecuteResultStatus) result;
