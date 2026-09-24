@@ -6,7 +6,7 @@
 
     <groupId>com.smart.retry</groupId>
     <artifactId>smart-retry</artifactId>
-    <version>${smart.retry.version}</version>
+    <version>1.0.2</version>
     <packaging>pom</packaging>
     <modules>
         <module>smart-retry-common</module>
@@ -27,7 +27,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <slf4j.version>1.7.36</slf4j.version>
-        <lombok.version>1.18.34</lombok.version>
+        <lombok.version>1.18.42</lombok.version>
         <guava.version>16.0</guava.version>
         <fastjson.version>1.2.83</fastjson.version>
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
