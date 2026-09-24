@@ -359,6 +359,10 @@ public class SimpleContainer implements RetryContainer {
             RetryTaskCache.unmark(key);
             return false;
         }
+        if (!containerRunning || !SmartRetryRunFlag.getFlag()) {
+            RetryTaskCache.unmark(key);
+            return false;
+        }
 
         // 失败且未到终态：保留占位锁，放入 delayQueue 等待异步调度重试
         delayQueue.put(new ScheduledTask(task));
