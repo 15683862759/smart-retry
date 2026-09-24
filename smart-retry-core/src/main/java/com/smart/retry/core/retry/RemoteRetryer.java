@@ -92,6 +92,11 @@ public class RemoteRetryer implements IRetryer {
 
         long taskId = retryConfiguration.getRetryTaskAcess().saveRetryTask(retryTask);
         retryTask.setId(taskId);
+        if (taskId <= 0) {
+            log.warn("[RemoteRetryer#registerRemoteRetyTask] retry task save failed, skip enqueue, taskId:{}",
+                    taskId);
+            return;
+        }
 
         // 将任务加入 DelayQueue 精准调度（窗口内才入队）
         SimpleContainer.enqueueIfInWindow(retryTask);
