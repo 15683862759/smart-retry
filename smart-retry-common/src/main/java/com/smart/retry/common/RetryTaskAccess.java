@@ -53,11 +53,11 @@ public interface RetryTaskAccess {
      *
      * <p>仅当任务仍为 WAITING(0)/FAIL(3) 且 {@code retry_num >= 1}
      * （且调用方传入的 {@code shardingKey} 与任务本身一致）时，
-     * 原子地将任务置为 RUNNING(1)、{@code retry_num - 1}，并写入 executor 与 next_plan_time。
+     * 原子地将任务置为 RUNNING(1)、{@code retry_num - 1}，并写入 executor 租约与 next_plan_time。
      * 并发下只有一个调用方受影响行数为 1，其余返回 0。
      *
      * @param id          任务 ID
-     * @param executor    认领执行方标识（通常是 IP）
+     * @param executor    本次认领生成的唯一租约标识
      * @param nextPlanTime 认领时计算好的下次执行时间
      * @param shardingKey 任务分片键
      * @return 受影响行数：1=认领成功，0=已被他人认领/状态不满足
@@ -77,7 +77,7 @@ public interface RetryTaskAccess {
      *
      * @param id          任务 ID
      * @param status      终态：SUCCESS(2) 或 FAIL(3)
-     * @param executor    认领时写入的租约持有者标识（通常是 IP）
+     * @param executor    认领时写入的唯一租约标识
      * @param retryNum    认领后内存中的剩余重试次数（扣减后值）
      * @param nextPlanTime 下次执行时间（FAIL 时用于重试调度）
      * @param attribute   错误信息/执行上下文，null 时不更新（保留历史）
@@ -94,7 +94,7 @@ public interface RetryTaskAccess {
      * 时生效，防止分片重叠窗口下覆盖他方已认领的 RUNNING。
      *
      * @param id        任务 ID
-     * @param executor  本实例标识（通常是 IP）
+     * @param executor  本次失败处理生成的唯一租约标识
      * @param retryNum  扣减前的剩余重试次数（用于 CAS 守卫）
      * @param attribute 失败原因
      * @return 受影响行数：1=写入成功，0=任务已被认领/状态已变化

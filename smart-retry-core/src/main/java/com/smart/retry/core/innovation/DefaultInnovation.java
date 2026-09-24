@@ -14,7 +14,6 @@ import com.smart.retry.common.notify.NotifyContext;
 import com.smart.retry.common.notify.RetryTaskNotify;
 import com.smart.retry.common.utils.ExceptionUtils;
 import com.smart.retry.common.utils.GsonTool;
-import com.smart.retry.common.utils.IpUtils;
 import com.smart.retry.core.cache.RetryCache;
 import com.smart.retry.core.nextPlanTimeStrategy.*;
 import org.apache.commons.lang3.ArrayUtils;
@@ -29,6 +28,7 @@ import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -58,7 +58,7 @@ public class DefaultInnovation implements SmartInnovation {
      *
      * <p>仅当任务在 DB 中仍为 WAITING(0)/FAIL(3) 且 {@code retry_num >= 1}
      * （且调用方传入的 sharding_key 与任务本身一致）时，
-     * 原子地置为 RUNNING(1)、{@code retry_num - 1}，并写入 executor 与 next_plan_time。
+     * 原子地置为 RUNNING(1)、{@code retry_num - 1}，并写入唯一 executor 租约与 next_plan_time。
      * 并发（同 JVM delayQueue 残留 + 手动触发，或多实例 Producer）下只有一个调用方受影响行数为 1，
      * 其余认领失败并抛出 {@link RetryTaskClaimedException}，从而保证业务方法至多被执行一次。
      *
@@ -66,9 +66,10 @@ public class DefaultInnovation implements SmartInnovation {
      * 认领失败抛出异常且在任何内存变更之前，无副作用。
      */
     private void beforeProcessTask(RetryTask retryTask) {
+        String leaseToken = UUID.randomUUID().toString();
         int claimed = retryConfiguration.getRetryTaskAcess().claimRetryTask(
                 retryTask.getId(),
-                IpUtils.getIp(),
+                leaseToken,
                 retryTask.getNextPlanTime(),
                 retryTask.getShardingKey());
         if (claimed != 1) {
@@ -80,7 +81,7 @@ public class DefaultInnovation implements SmartInnovation {
         if (retryNum >= 1) {
             retryTask.setRetryNum(retryNum - 1);
         }
-        retryTask.setExecutor(IpUtils.getIp());
+        retryTask.setExecutor(leaseToken);
     }
 
     @Override
@@ -169,18 +170,19 @@ public class DefaultInnovation implements SmartInnovation {
     }
 
     private void processNullTaskObject() {
+        String leaseToken = UUID.randomUUID().toString();
         Integer retryNum = retryTask.getRetryNum();
         int before = retryNum == null ? 0 : retryNum;
         if (before >= 1) {
             retryTask.setRetryNum(before - 1);
         }
         retryTask.setStatus(RetryTaskStatus.FAIL.getCode());
-        retryTask.setExecutor(IpUtils.getIp());
+        retryTask.setExecutor(leaseToken);
         retryTask.setAttribute("taskObject is null");
         // 条件化更新（乐观锁 CAS 守卫）：仅当任务仍为 WAITING/FAIL 且 retry_num 与内存一致
         // （扣减前值）时写 FAIL 并扣减一次，防止分片重叠窗口下覆盖他方已认领的 RUNNING 或已终态。
         int updated = retryConfiguration.getRetryTaskAcess()
-                .markNullTaskObjectFail(retryTask.getId(), IpUtils.getIp(), before, "taskObject is null");
+                .markNullTaskObjectFail(retryTask.getId(), leaseToken, before, "taskObject is null");
         if (updated != 1) {
             LOGGER.warn("[DefaultInnovation#processNullTaskObject] mark fail skipped, "
                     + "task may be claimed/revived, taskId:{}", retryTask.getId());

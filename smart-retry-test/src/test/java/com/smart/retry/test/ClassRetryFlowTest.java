@@ -5,6 +5,7 @@ import com.smart.retry.common.constant.NextPlanTimeStrategyEnum;
 import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.common.model.RetryTask;
 import com.smart.retry.common.model.RetryTaskBuilder;
+import com.smart.retry.common.utils.IpUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -64,6 +65,7 @@ public class ClassRetryFlowTest extends AbstractTest {
         long taskId = retryTaskOperator.createTask(builder);
         Assert.assertTrue("监听器重试任务应创建成功", taskId > 0);
         Assert.assertTrue("任务应在10秒内进入FAIL状态", awaitTaskStatus(taskId, RetryTaskStatus.FAIL));
+        String failedLease = queryExecutor(taskId);
 
         Assert.assertEquals("可重试的FAIL任务重复提交应被跳过", -1L,
                 retryTaskOperator.createTask(builder));
@@ -78,6 +80,10 @@ public class ClassRetryFlowTest extends AbstractTest {
         Assert.assertEquals("任务终态应为 SUCCESS",
                 RetryTaskStatus.SUCCESS.getCode(), task.getStatus());
         Assert.assertEquals("retryNum 应为0", Integer.valueOf(0), task.getRetryNum());
+
+        String successLease = queryExecutor(taskId);
+        Assert.assertNotEquals("不同执行轮次应使用不同租约", failedLease, successLease);
+        Assert.assertNotEquals("任务租约不能退化为固定IP", IpUtils.getIp(), successLease);
     }
 
     private boolean awaitTaskStatus(long taskId, RetryTaskStatus expectedStatus)
@@ -99,5 +105,10 @@ public class ClassRetryFlowTest extends AbstractTest {
                 "SELECT COUNT(*) FROM retry_task WHERE task_code = ? AND parameters LIKE ?",
                 Integer.class, TASK_CODE, "%" + runId + "%");
         return count == null ? 0 : count;
+    }
+
+    private String queryExecutor(long taskId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT executor FROM retry_task WHERE id = ?", String.class, taskId);
     }
 }

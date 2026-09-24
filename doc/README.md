@@ -44,7 +44,7 @@
 | next_plan_time | DATETIME/DATE/TIMESTAMP | 否 | 下次执行时间 |
 | retry_num | INT/NUMBER(10)/INTEGER | 否 | 重试次数 |
 | creator | VARCHAR(64) | 否 | 创建者（默认IP） |
-| executor | VARCHAR(64) | 否 | 执行者 |
+| executor | VARCHAR(64) | 否 | 执行租约（每次认领唯一） |
 | origin_retry_num | INT/NUMBER(10)/INTEGER | 否 | 存放任务原始的次数 |
 | current_log_id | BIGINT/NUMBER(20) | 否 | 当前运行日志id |
 | unique_key | VARCHAR(64) | 否 | 唯一标识 |
