@@ -20,6 +20,7 @@ import com.smart.retry.core.nextPlanTimeStrategy.*;
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.aop.framework.AopProxyUtils;
 import org.springframework.aop.support.AopUtils;
 
 import java.lang.reflect.Method;
@@ -212,7 +213,11 @@ public class DefaultInnovation implements SmartInnovation {
         }
         if (retryTaskTypeEnum == RetryTaskTypeEnum.METHOD) {
             Object[] args = retryConfiguration.getSmartSerializer().deSerializer(method, retryTask.getParameters());
-            return method.invoke(taskObject.getTargetObj(), args);
+            // METHOD 重试必须回到真实业务对象执行。若继续调用 Spring 代理，
+            // @RetryOnMethod 拦截器会再次注册同 uniqueKey 的任务并被去重拦截，
+            // 造成后续重试停止推进。
+            Object target = AopProxyUtils.getSingletonTarget(taskObject.getTargetObj());
+            return method.invoke(target != null ? target : taskObject.getTargetObj(), args);
         }
         throw new RetryException("retryTaskTypeEnum is not support");
     }

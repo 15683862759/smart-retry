@@ -37,8 +37,9 @@ public @interface RetryOnMethod {
     Class<? extends Throwable>[] exclude() default {};
 
     /**
-     * 最大的重试次数
-     * @return
+     * 最大执行次数，包含首次同步调用；小于等于 1 时不创建异步重试任务
+     *
+     * @return 最大执行次数
      */
     int maxAttempt() default 3;
 

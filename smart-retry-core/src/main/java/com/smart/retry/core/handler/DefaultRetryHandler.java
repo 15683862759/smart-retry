@@ -85,7 +85,7 @@ public class DefaultRetryHandler implements RetryHandler {
         RetryCondition retryCondition = new DefaultRetryCondition(retryAttemptContext);
         boolean flag = retryCondition.needRetry();
         //如果需要重试，则执行重试
-        if(flag){
+        if (flag && retryable.maxAttempt() > 1) {
             doRetry(retryAttemptContext);
         }
         //如果异常不为null直接抛出异常

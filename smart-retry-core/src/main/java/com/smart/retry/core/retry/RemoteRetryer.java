@@ -66,9 +66,9 @@ public class RemoteRetryer implements IRetryer {
 
 
         RetryTask retryTask = new RetryTask();
-        retryTask.setRetryNum(retryable.maxAttempt());
+        retryTask.setRetryNum(retryable.maxAttempt() - 1);
         retryTask.setDelaySecond(retryable.firstDelaySecond());
-        retryTask.setOriginRetryNum(retryable.maxAttempt());
+        retryTask.setOriginRetryNum(retryable.maxAttempt() - 1);
         retryTask.setCreator(IpUtils.getIp());
         retryTask.setStatus(RetryTaskStatus.WAITING.getCode());
         Method method = methodInvocation.getMethod();

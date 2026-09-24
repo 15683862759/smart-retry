@@ -12,5 +12,21 @@ import com.smart.retry.common.constant.ExecuteResultStatus;
  * @param status        本次执行状态
  * @param businessResult 业务方法/监听器返回值，可为 null
  */
-public record TaskExecutionResult(ExecuteResultStatus status, Object businessResult) {
+public class TaskExecutionResult {
+
+    private final ExecuteResultStatus status;
+    private final Object businessResult;
+
+    public TaskExecutionResult(ExecuteResultStatus status, Object businessResult) {
+        this.status = status;
+        this.businessResult = businessResult;
+    }
+
+    public ExecuteResultStatus status() {
+        return status;
+    }
+
+    public Object businessResult() {
+        return businessResult;
+    }
 }

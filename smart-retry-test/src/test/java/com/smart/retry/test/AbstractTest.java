@@ -11,5 +11,5 @@ import org.springframework.test.context.junit4.SpringRunner;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = SmartTestApplication.class)
-public class AbstractTest {
+public abstract class AbstractTest {
 }

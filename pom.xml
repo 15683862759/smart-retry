@@ -21,13 +21,13 @@
 
     <properties>
         <smart.retry.version>1.0.2</smart.retry.version>
-        <maven.compiler.target>17</maven.compiler.target>
-        <maven.compiler.source>17</maven.compiler.source>
-        <java.version>17</java.version>
+        <maven.compiler.target>8</maven.compiler.target>
+        <maven.compiler.source>8</maven.compiler.source>
+        <java.version>8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <slf4j.version>2.0.9</slf4j.version>
-        <lombok.version>1.18.36</lombok.version>
+        <slf4j.version>1.7.36</slf4j.version>
+        <lombok.version>1.18.34</lombok.version>
         <guava.version>16.0</guava.version>
         <fastjson.version>1.2.83</fastjson.version>
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
@@ -178,11 +178,6 @@
                 <groupId>org.mybatis.spring.boot</groupId>
                 <artifactId>mybatis-spring-boot-starter</artifactId>
                 <version>${mybatis-spring-boot-starter.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>mysql</groupId>
-                <artifactId>mysql-connector-java</artifactId>
-                <version>${mysql-connector-java.version}</version>
             </dependency>
 
         </dependencies>
