@@ -22,7 +22,7 @@ mvn clean compile
 mvn test
 
 # 运行单个测试类
-mvn -pl smart-retry-test test -Dtest=MybatisTest
+mvn -pl smart-retry-test test -Dtest=ClassRetryFlowTest
 
 # 跳过测试打包
 mvn clean package -DskipTests
