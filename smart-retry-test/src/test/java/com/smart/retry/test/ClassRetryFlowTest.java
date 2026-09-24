@@ -57,12 +57,18 @@ public class ClassRetryFlowTest extends AbstractTest {
                 .withTaskDesc("监听器模式完整重试流程")
                 .withRetryNum(3)
                 .withDelaySecond(1)
-                .withIntervalSecond(1)
+                .withIntervalSecond(2)
                 .withNextPlanTimeStrategy(NextPlanTimeStrategyEnum.FIXED)
                 .withParam(param);
 
         long taskId = retryTaskOperator.createTask(builder);
         Assert.assertTrue("监听器重试任务应创建成功", taskId > 0);
+        Assert.assertTrue("任务应在10秒内进入FAIL状态", awaitTaskStatus(taskId, RetryTaskStatus.FAIL));
+
+        Assert.assertEquals("可重试的FAIL任务重复提交应被跳过", -1L,
+                retryTaskOperator.createTask(builder));
+        Assert.assertEquals("重复提交不应产生新任务", 1, countTaskByRunId(runId));
+
         Assert.assertTrue("监听器重试任务应在30秒内完成",
                 ClassRetryFlowNotify.awaitCompletion(30, TimeUnit.SECONDS));
 
@@ -72,5 +78,26 @@ public class ClassRetryFlowTest extends AbstractTest {
         Assert.assertEquals("任务终态应为 SUCCESS",
                 RetryTaskStatus.SUCCESS.getCode(), task.getStatus());
         Assert.assertEquals("retryNum 应为0", Integer.valueOf(0), task.getRetryNum());
+    }
+
+    private boolean awaitTaskStatus(long taskId, RetryTaskStatus expectedStatus)
+            throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 10_000L;
+        while (System.currentTimeMillis() < deadline) {
+            Integer status = jdbcTemplate.queryForObject(
+                    "SELECT status FROM retry_task WHERE id = ?", Integer.class, taskId);
+            if (expectedStatus.getCode().equals(status)) {
+                return true;
+            }
+            TimeUnit.MILLISECONDS.sleep(100);
+        }
+        return false;
+    }
+
+    private int countTaskByRunId(String runId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM retry_task WHERE task_code = ? AND parameters LIKE ?",
+                Integer.class, TASK_CODE, "%" + runId + "%");
+        return count == null ? 0 : count;
     }
 }

@@ -39,7 +39,8 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
         retryTask.setShardingKey(ShardingContextHolder.getRandomShardingIndex());
         retryTaskQuery.setTaskCode(retryTask.getTaskCode());
         retryTaskQuery.setStatusList(Lists.newArrayList(RetryTaskStatus.WAITING.getCode(),
-                RetryTaskStatus.RUNNING.getCode()));
+                RetryTaskStatus.RUNNING.getCode(), RetryTaskStatus.FAIL.getCode()));
+        retryTaskQuery.setMinRetryNum(1);
         List<RetryTaskDO> retryTaskList = retryTaskDao.selectByQuery(retryTaskQuery);
         if (retryTaskList.size() > 0) {
             logger.warn("[RetryTaskRepoImpl-saveRetryTask]uniqueKey:{} already exists, skip insert", uniqueKey);
