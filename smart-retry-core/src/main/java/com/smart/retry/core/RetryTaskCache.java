@@ -60,4 +60,11 @@ public class RetryTaskCache {
         return IN_MEMORY_TASKS.size();
     }
 
+    /**
+     * 容器销毁时清空内存标记，避免残留 key 阻断后续同任务重新调度。
+     */
+    public synchronized static void clear() {
+        IN_MEMORY_TASKS.clear();
+    }
+
 }

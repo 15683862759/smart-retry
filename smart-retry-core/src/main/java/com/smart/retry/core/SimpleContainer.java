@@ -50,6 +50,12 @@ public class SimpleContainer implements RetryContainer {
      */
     private static Thread schedulerThread;
 
+    private static Thread producerThread;
+
+    private static Thread deadLetterThread;
+
+    private static volatile boolean containerRunning;
+
     /**
      * 预加载窗口毫秒数
      */
@@ -88,29 +94,36 @@ public class SimpleContainer implements RetryContainer {
 
     @Override
     public void start() {
-        initTaskExecutor(smartConfigure);
+        synchronized (SimpleContainer.class) {
+            if (containerRunning) {
+                return;
+            }
+            SmartRetryRunFlag.setFlag(true);
+            initTaskExecutor(smartConfigure);
 
-        // 初始化预加载窗口
-        preloadWindowMs = (long) smartConfigure.getTaskFindInterval() * smartConfigure.getScanPreloadMultiplier() * 1000L;
+            // 初始化预加载窗口
+            preloadWindowMs = (long) smartConfigure.getTaskFindInterval() * smartConfigure.getScanPreloadMultiplier() * 1000L;
 
-        // Producer 兜底扫描线程（低频，仅加载到 DelayQueue）
-        Thread producerTask = new Thread(new ProducerTask(), "smart-retry-producer");
-        producerTask.start();
+            // Producer 兜底扫描线程（低频，仅加载到 DelayQueue）
+            producerThread = new Thread(new ProducerTask(), "smart-retry-producer");
+            producerThread.start();
 
-        // SchedulerThread 调度线程（从 DelayQueue 消费，精准触发）
-        schedulerThread = new Thread(new SchedulerThread(), "smart-retry-scheduler");
-        schedulerThread.start();
+            // SchedulerThread 调度线程（从 DelayQueue 消费，精准触发）
+            schedulerThread = new Thread(new SchedulerThread(), "smart-retry-scheduler");
+            schedulerThread.start();
 
-        if (smartConfigure.getDeadTask().getDeadTaskCheck()) {
-            Thread deadLetterTask = new Thread(new DeadLetterTask());
-            deadLetterTask.setDaemon(true);
-            deadLetterTask.start();
-        }
+            if (smartConfigure.getDeadTask().getDeadTaskCheck()) {
+                deadLetterThread = new Thread(new DeadLetterTask());
+                deadLetterThread.setDaemon(true);
+                deadLetterThread.start();
+            }
 
-        if (smartConfigure.getClearTask().getEnabled()) {
-            initTaskScheduler();
-            CronTrigger trigger = new CronTrigger(smartConfigure.getClearTask().getCron());
-            taskScheduler.schedule(new ClearTask(), trigger);
+            if (smartConfigure.getClearTask().getEnabled()) {
+                initTaskScheduler();
+                CronTrigger trigger = new CronTrigger(smartConfigure.getClearTask().getCron());
+                taskScheduler.schedule(new ClearTask(), trigger);
+            }
+            containerRunning = true;
         }
     }
 
@@ -153,7 +166,40 @@ public class SimpleContainer implements RetryContainer {
 
     @Override
     public void destroy() {
+        synchronized (SimpleContainer.class) {
+            if (!containerRunning) {
+                return;
+            }
+            containerRunning = false;
+            SmartRetryRunFlag.setFlag(false);
 
+            if (schedulerThread != null) {
+                schedulerThread.interrupt();
+            }
+            if (producerThread != null) {
+                producerThread.interrupt();
+            }
+            if (deadLetterThread != null) {
+                deadLetterThread.interrupt();
+            }
+            if (consumerExecutor != null) {
+                consumerExecutor.shutdownNow();
+            }
+            if (taskScheduler != null) {
+                taskScheduler.shutdown();
+            }
+
+            delayQueue.clear();
+            RetryCache.clear();
+            RetryTaskCache.clear();
+
+            schedulerThread = null;
+            producerThread = null;
+            deadLetterThread = null;
+            consumerExecutor = null;
+            consumerQueue = null;
+            taskScheduler = null;
+        }
     }
 
     static String getUniqueKey(RetryTask retryTask) {
@@ -370,7 +416,7 @@ public class SimpleContainer implements RetryContainer {
     class SchedulerThread implements Runnable {
         @Override
         public void run() {
-            while (SmartRetryExit.isExit()) {
+            while (SmartRetryExit.isExit() && SmartRetryRunFlag.getFlag()) {
                 try {
                     ScheduledTask scheduled = delayQueue.take();  // 阻塞取第一个
                     List<ScheduledTask> batch = new ArrayList<>(101);
@@ -446,12 +492,15 @@ public class SimpleContainer implements RetryContainer {
         @Override
         public void run() {
 
-            while (true) {
+            while (SmartRetryExit.isExit() && SmartRetryRunFlag.getFlag()) {
                 if (!SmartRetryExit.isExit()) {
                     return;
                 }
                 try {
                     TimeUnit.SECONDS.sleep(15);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -509,7 +558,7 @@ public class SimpleContainer implements RetryContainer {
         public void run() {
 
             LOGGER.info("[ProducerTask#run] start run producer task,sleepBaseTimeMilliseconds {}", sleepBaseTimeMilliseconds);
-            while (SmartRetryExit.isExit()) {
+            while (SmartRetryExit.isExit() && SmartRetryRunFlag.getFlag()) {
                 if (!SmartRetryRunFlag.getFlag()) {
                     sleepOneInterval();
                     continue;

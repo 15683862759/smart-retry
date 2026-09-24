@@ -36,6 +36,13 @@ public class RetryCache {
         RETRY_CACHE.remove(key);
     }
 
+    /**
+     * 容器销毁时清空已注册的重试定义，避免应用上下文重建后重复注册失败。
+     */
+    public static void clear() {
+        RETRY_CACHE.clear();
+    }
+
     public static int retryCount(String key) {
         return RETRY_CACHE.size();
     }

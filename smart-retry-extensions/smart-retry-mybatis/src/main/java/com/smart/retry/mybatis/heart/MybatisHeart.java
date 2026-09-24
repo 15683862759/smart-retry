@@ -31,6 +31,10 @@ public class MybatisHeart implements RetryTaskHeart {
 
     private SmartExecutorConfigure smartExecutorConfigure;
 
+    private volatile Thread heartbeatThread;
+
+    private volatile Thread scrambleDeadShardingThread;
+
 
 
 
@@ -85,6 +89,9 @@ public class MybatisHeart implements RetryTaskHeart {
                         LOGGER.debug("[MybatisHeart#heartBeat] heart beat success, instanceId:{}, heartBeatCount:{}", instanceId, heartBeatCount);
                     }
 
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
                 } catch (Exception e) {
                     LOGGER.error("[MybatisHeart#heartBeat] heart beat error，instanceId:{}", instanceId, e);
                 }
@@ -118,6 +125,9 @@ public class MybatisHeart implements RetryTaskHeart {
                     if (LOGGER.isDebugEnabled()) {
                         LOGGER.debug("[MybatisHeart#scrambleDeadSharding] scrambleDeadSharding success, instanceId:{}, shardingCount:{}", instanceId, shardingCount);
                     }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
                 } catch (Exception e) {
                     LOGGER.error("[MybatisHeart#scrambleDeadSharding] scrambleDeadSharding error，instanceId:{}", instanceId, e);
                 }
@@ -132,9 +142,14 @@ public class MybatisHeart implements RetryTaskHeart {
 
     @Override
     public void heartBeat() {
-        Thread heartbeatThread = new Thread(new HeartbeatTask());
-        heartbeatThread.setDaemon(true);
-        heartbeatThread.start();
+        if (heartbeatThread != null) {
+            return;
+        }
+        Thread thread = new Thread(new HeartbeatTask());
+        thread.setName("smart-retry-heartbeat");
+        thread.setDaemon(true);
+        heartbeatThread = thread;
+        thread.start();
 
     }
 
@@ -143,8 +158,30 @@ public class MybatisHeart implements RetryTaskHeart {
      */
     @Override
     public void scrambleDeadSharding() {
-        Thread scrambleDeadShardingThread = new Thread(new ScrambleDeadShardingTask());
-        scrambleDeadShardingThread.setDaemon(true);
-        scrambleDeadShardingThread.start();
+        if (scrambleDeadShardingThread != null) {
+            return;
+        }
+        Thread thread = new Thread(new ScrambleDeadShardingTask());
+        thread.setName("smart-retry-scramble");
+        thread.setDaemon(true);
+        scrambleDeadShardingThread = thread;
+        thread.start();
+    }
+
+    /**
+     * 中断并释放心跳与死分片扫描线程。
+     */
+    @Override
+    public synchronized void stop() {
+        stopThread(heartbeatThread);
+        heartbeatThread = null;
+        stopThread(scrambleDeadShardingThread);
+        scrambleDeadShardingThread = null;
+    }
+
+    private void stopThread(Thread thread) {
+        if (thread != null) {
+            thread.interrupt();
+        }
     }
 }

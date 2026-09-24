@@ -28,4 +28,11 @@ public interface RetryTaskHeart {
     default void scrambleDeadSharding() {
 
     }
+
+    /**
+     * 停止心跳与死分片扫描线程。
+     */
+    default void stop() {
+        // do nothing
+    }
 }

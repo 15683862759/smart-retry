@@ -26,6 +26,6 @@ public class HeartbeatContainer implements RetryContainer {
 
     @Override
     public void destroy() {
-
+        heart.stop();
     }
 }
