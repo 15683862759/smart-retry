@@ -48,6 +48,8 @@ public class RetrySnapshot {
             return;
         }
         matchedPre.setNext(null);
+        // 内层方法退出后，父节点重新成为链尾；否则父方法后续抛出的异常不会注册重试。
+        matchedPre.setTail(true);
     }
 
     /**
