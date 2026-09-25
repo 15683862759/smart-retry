@@ -361,6 +361,28 @@ public class RetryDefectRegressionTest extends AbstractTest {
     }
 
     @Test
+    public void testUpdateTaskRejectsConcurrentDelete() {
+        WebRetryTaskDao taskDao = Mockito.mock(WebRetryTaskDao.class);
+        RetryTaskService service = newService(taskDao);
+        RetryTaskDO task = new RetryTaskDO();
+        task.setId(1L);
+        task.setStatus(RetryTaskStatus.WAITING.getCode());
+        Mockito.when(taskDao.selectById(1L)).thenReturn(task).thenReturn(null);
+        Mockito.when(taskDao.update(task)).thenReturn(0);
+
+        TaskUpdateRequest request = new TaskUpdateRequest();
+        request.setId(1L);
+        request.setRetryNum(1);
+
+        try {
+            service.updateTask(request);
+            Assert.fail("任务被并发删除时更新应返回业务失败");
+        } catch (BusinessException expected) {
+            Assert.assertEquals("任务状态已变化，更新失败", expected.getMessage());
+        }
+    }
+
+    @Test
     public void testDeleteTaskRejectsConcurrentRunningTransition() {
         WebRetryTaskDao taskDao = Mockito.mock(WebRetryTaskDao.class);
         RetryTaskService service = newService(taskDao);

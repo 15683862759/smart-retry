@@ -200,12 +200,6 @@ public class RetryTaskService {
             taskDO.setStatus(newStatus);
         }
         
-        // 再次检查任务状态（防止并发问题）
-        RetryTaskDO currentTask = webRetryTaskDao.selectById(request.getId());
-        if (RetryTaskStatus.RUNNING.getCode().equals(currentTask.getStatus())) {
-            throw new BusinessException("任务正在执行中，无法保存");
-        }
-        
         int updated = webRetryTaskDao.update(taskDO);
         if (updated == 0) {
             throw new BusinessException("任务状态已变化，更新失败");
