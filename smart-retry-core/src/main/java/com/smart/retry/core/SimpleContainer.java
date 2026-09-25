@@ -652,8 +652,8 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                     if (CollectionUtils.isEmpty(allRetryTask)) {
                         continue;
                     }
-                    //将任务重新设置为待执行状态,
-                    // TODO 考虑超时的任务是否需要在内存中做线程的中断
+                    //将任务重新设置为待执行状态。原执行方的租约续期会因状态变更失败而中断工作线程，
+                    //避免失去执行权的旧线程继续执行业务并产生重复副作用。
                     // 统一超时判定时间点，避免循环处理期间时间漂移
                     Date deadTaskTime = new Date(System.currentTimeMillis()
                             - smartConfigure.getDeadTask().getTaskMaxExecuteTimeout() * 1000L);

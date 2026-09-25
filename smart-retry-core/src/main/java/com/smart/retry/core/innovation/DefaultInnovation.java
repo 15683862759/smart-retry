@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @Author xiaoqiang
@@ -62,6 +63,34 @@ public class DefaultInnovation implements SmartInnovation {
 
     private final long leaseRenewalSeconds;
 
+    /**
+     * 本次执行的租约状态。
+     *
+     * <p>false 表示租约仍在有效续期；true 表示数据库已确认本次执行不再持有
+     * RUNNING 任务的 executor 租约（例如任务已被死信复活或新执行方接管）。
+     */
+    private final AtomicBoolean leaseLost = new AtomicBoolean(false);
+
+    /**
+     * 当前执行业务代码的工作线程引用。
+     *
+     * <p>只在 executionActive 为 true 时使用；租约心跳线程据此向旧执行方
+     * 发送中断信号，尽量终止已经失去执行权的业务调用。
+     */
+    private volatile Thread workerThread;
+
+    /**
+     * 标识工作线程是否仍在执行本次任务。
+     *
+     * <p>finally 中先置 false 再取消心跳，避免任务结束后心跳线程
+     * 误把线程池线程标记成 interrupted，影响下一个任务。
+     */
+    private final AtomicBoolean executionActive = new AtomicBoolean(false);
+
+    /**
+     * 当前任务租约心跳的调度句柄，用于租约失效后立即停止后续续期。
+     */
+    private volatile ScheduledFuture<?> leaseHeartbeat;
 
     private static final Map<Class<? extends RetryTaskNotify>, RetryTaskNotify> retryTaskNotifyMap = new ConcurrentHashMap<>();
 
@@ -147,7 +176,9 @@ public class DefaultInnovation implements SmartInnovation {
 
         // 认领成功后立即开启执行租约心跳。长任务执行期间持续刷新 gmt_modified，
         // 死信线程便不会把仍在运行的业务误判为超时并复活给其他执行方。
-        ScheduledFuture<?> leaseHeartbeat = startExecutionLeaseHeartbeat();
+        workerThread = Thread.currentThread();
+        executionActive.set(true);
+        startExecutionLeaseHeartbeat();
 
         Method method = taskObject.getMethod();
 
@@ -179,7 +210,14 @@ public class DefaultInnovation implements SmartInnovation {
             notifyContext.setThrowable(ex);
             throw ex;
         } finally {
+            executionActive.set(false);
             cancelExecutionLeaseHeartbeat(leaseHeartbeat);
+            // 若业务代码忽略中断并正常返回，清除由租约丢失触发的中断位，
+            // 防止中断状态泄漏给线程池中的下一个任务。
+            if (leaseLost.get() && Thread.interrupted()) {
+                LOGGER.warn("[DefaultInnovation#invoke] cleared interrupt flag after lost lease, taskId:{}",
+                        retryTask.getId());
+            }
             String exceptionMsg = ExceptionUtils.createConciseStackTraceMessage(throwable);
             if (exceptionMsg != null) {
                 retryTask.setAttribute(exceptionMsg);
@@ -253,8 +291,9 @@ public class DefaultInnovation implements SmartInnovation {
      */
     private ScheduledFuture<?> startExecutionLeaseHeartbeat() {
         try {
-            return LEASE_HEARTBEAT_EXECUTOR.scheduleAtFixedRate(this::renewExecutionLease,
+            leaseHeartbeat = LEASE_HEARTBEAT_EXECUTOR.scheduleAtFixedRate(this::renewExecutionLease,
                     leaseRenewalSeconds, leaseRenewalSeconds, TimeUnit.SECONDS);
+            return leaseHeartbeat;
         } catch (Exception ex) {
             LOGGER.warn("[DefaultInnovation#startExecutionLeaseHeartbeat] start failed, taskId:{}",
                     retryTask.getId(), ex);
@@ -267,6 +306,13 @@ public class DefaultInnovation implements SmartInnovation {
             int renewed = retryConfiguration.getRetryTaskAcess()
                     .renewExecutionLease(retryTask.getId(), retryTask.getExecutor());
             if (renewed != 1) {
+                if (leaseLost.compareAndSet(false, true)) {
+                    Thread worker = workerThread;
+                    if (worker != null && executionActive.get()) {
+                        worker.interrupt();
+                    }
+                }
+                cancelExecutionLeaseHeartbeat(leaseHeartbeat);
                 LOGGER.warn("[DefaultInnovation#renewExecutionLease] lease skipped, "
                                 + "task may be terminal or revived, taskId:{}, executor:{}",
                         retryTask.getId(), retryTask.getExecutor());
