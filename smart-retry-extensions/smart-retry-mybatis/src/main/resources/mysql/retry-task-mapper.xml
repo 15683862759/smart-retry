@@ -226,7 +226,7 @@
             gmt_modified = CURRENT_TIMESTAMP
         where id = #{id,jdbcType=BIGINT}
           and status in (0, 3)
-          and retry_num &gt;= 0
+          and retry_num &gt;= 1
           and sharding_key = #{shardingKey,jdbcType=BIGINT}
 </update>
 

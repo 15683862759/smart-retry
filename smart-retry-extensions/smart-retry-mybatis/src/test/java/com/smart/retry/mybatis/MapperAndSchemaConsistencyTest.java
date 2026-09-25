@@ -71,6 +71,22 @@ public class MapperAndSchemaConsistencyTest {
                 oracle.contains("BEFORE INSERT OR UPDATE ON retry_task"));
     }
 
+    @Test
+    public void testRetryNumGuardsAreConsistentInEveryDialect() throws Exception {
+        String[] dialects = {"mysql", "postgresql", "oracle"};
+        for (String dialect : dialects) {
+            Document document = parse(Paths.get(
+                    "src/main/resources", dialect, "retry-task-mapper.xml"));
+            Element claim = statement(document, "claimTask");
+            Element markNull = statement(document, "markNullTaskObjectFail");
+
+            Assert.assertTrue(dialect + " claimTask should only claim tasks with retry_num >= 1",
+                    text(claim).contains("retry_num >= 1"));
+            Assert.assertTrue(dialect + " markNullTaskObjectFail should allow retry_num >= 0",
+                    text(markNull).contains("retry_num >= 0"));
+        }
+    }
+
     private Set<String> statementIds(String dialect) throws Exception {
         Document document = parse(Paths.get(
                 "src/main/resources", dialect, "retry-task-mapper.xml"));
@@ -95,6 +111,23 @@ public class MapperAndSchemaConsistencyTest {
         factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
         factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
         return factory.newDocumentBuilder().parse(path.toFile());
+    }
+
+    private Element statement(Document document, String id) {
+        NodeList statements = document.getElementsByTagName("update");
+        for (int i = 0; i < statements.getLength(); i++) {
+            if (statements.item(i) instanceof Element) {
+                Element element = (Element) statements.item(i);
+                if (id.equals(element.getAttribute("id"))) {
+                    return element;
+                }
+            }
+        }
+        throw new AssertionError("Missing update statement: " + id);
+    }
+
+    private String text(Element element) {
+        return element.getTextContent();
     }
 
     private String read(String path) throws IOException {

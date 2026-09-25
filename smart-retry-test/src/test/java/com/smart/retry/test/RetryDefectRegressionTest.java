@@ -224,6 +224,11 @@ public class RetryDefectRegressionTest extends AbstractTest {
         Long taskId = jdbcTemplate.queryForObject(
                 "SELECT id FROM retry_task WHERE unique_key = ?", Long.class, uniqueKey);
         try {
+            int claimed = retryTaskAccess.claimRetryTask(
+                    taskId, "zero-retry-claim", new java.util.Date(),
+                    ShardingContextHolder.getRandomShardingIndex());
+            Assert.assertEquals("剩余次数为 0 的任务不能被普通执行认领", 0, claimed);
+
             int updated = retryTaskAccess.markNullTaskObjectFail(
                     taskId, "zero-retry-lease", 0, new java.util.Date(), "taskObject is null");
 

@@ -322,7 +322,7 @@
             gmt_modified = SYSDATE
         where id = #{id,jdbcType=BIGINT}
           and status in (0, 3)
-          and retry_num &gt;= 1
+          and retry_num &gt;= 0
           and retry_num = #{retryNum}
     </update>
 
