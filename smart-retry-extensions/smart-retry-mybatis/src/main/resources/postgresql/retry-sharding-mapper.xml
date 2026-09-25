@@ -62,6 +62,9 @@
         last_heartbeat = NOW()
         FROM expired
         WHERE retry_sharding.id = expired.id
+        <![CDATA[
+        AND retry_sharding.last_heartbeat < NOW() - (#{timeout}::text || ' seconds')::interval
+        ]]>
     </update>
 
 

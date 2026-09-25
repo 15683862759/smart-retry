@@ -57,6 +57,9 @@
         rs.instance_id = #{instanceId},
         rs.last_heartbeat = NOW()
         WHERE rs.id = tmp.id
+        <![CDATA[
+        AND rs.last_heartbeat < (NOW() - INTERVAL #{timeout} SECOND)
+        ]]>
     </update>
 
 

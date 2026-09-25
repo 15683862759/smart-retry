@@ -84,6 +84,9 @@
         ORDER BY id
         ) WHERE ROWNUM = 1
         )
+        <![CDATA[
+        AND last_heartbeat < SYSDATE - (#{timeout} / 86400)
+        ]]>
     </update>
 
     <update id="updateLastHeartbeat">

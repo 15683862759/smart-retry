@@ -101,6 +101,36 @@ public class MapperAndSchemaConsistencyTest {
                         Pattern.CASE_INSENSITIVE).matcher(sql).find());
     }
 
+    @Test
+    public void testScrambleDeadShardingRechecksHeartbeatBeforeUpdate() throws Exception {
+        Pattern mysqlGuard = Pattern.compile(
+                "WHERE\\s+rs\\.id\\s*=\\s*tmp\\.id\\s+AND\\s+rs\\.last_heartbeat\\s*<",
+                Pattern.CASE_INSENSITIVE);
+        Pattern postgresGuard = Pattern.compile(
+                "WHERE\\s+retry_sharding\\.id\\s*=\\s*expired\\.id\\s+AND\\s+retry_sharding\\.last_heartbeat\\s*<",
+                Pattern.CASE_INSENSITIVE);
+        Pattern oracleGuard = Pattern.compile(
+                "\\)\\s+AND\\s+last_heartbeat\\s*<",
+                Pattern.CASE_INSENSITIVE);
+
+        String[][] cases = {
+                {"mysql", "src/main/resources/mysql/retry-sharding-mapper.xml"},
+                {"postgresql", "src/main/resources/postgresql/retry-sharding-mapper.xml"},
+                {"oracle", "src/main/resources/oracle/retry-sharding-mapper.xml"}
+        };
+        for (String[] dialectCase : cases) {
+            String dialect = dialectCase[0];
+            Document document = parse(Paths.get(dialectCase[1]));
+            Element scramble = statement(document, "scrambleDeadSharding");
+            String sql = text(scramble);
+            Pattern guard = "mysql".equals(dialect) ? mysqlGuard
+                    : "postgresql".equals(dialect) ? postgresGuard : oracleGuard;
+
+            Assert.assertTrue(dialect + " scrambleDeadSharding must recheck heartbeat timeout in the outer UPDATE",
+                    guard.matcher(sql).find());
+        }
+    }
+
     private Set<String> statementIds(String dialect) throws Exception {
         Document document = parse(Paths.get(
                 "src/main/resources", dialect, "retry-task-mapper.xml"));
