@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class DefaultInnovationTest {
 
@@ -108,6 +108,47 @@ public class DefaultInnovationTest {
         Assertions.assertEquals(1, task.getRetryNum());
     }
 
+    @Test
+    void testClassListenerInheritsGenericTypeFromParentClass() throws Throwable {
+        AtomicReference<Object> consumedParam = new AtomicReference<>();
+        ChildListener listener = new ChildListener(consumedParam);
+        RetryTaskAccess taskAccess = (RetryTaskAccess) Proxy.newProxyInstance(
+                RetryTaskAccess.class.getClassLoader(),
+                new Class<?>[]{RetryTaskAccess.class},
+                (proxy, method, args) -> {
+                    if ("claimRetryTask".equals(method.getName())) {
+                        return 1;
+                    }
+                    if ("markRetryTaskTerminal".equals(method.getName())) {
+                        return 1;
+                    }
+                    throw new UnsupportedOperationException(method.getName());
+                });
+        RetryConfiguration configuration = configuration(taskAccess);
+
+        RetryTask task = new RetryTask();
+        task.setId(3L);
+        task.setTaskCode("inherited-generic-listener");
+        task.setRetryNum(1);
+        task.setOriginRetryNum(1);
+        task.setIntervalSecond(60);
+        task.setNextPlanTimeStrategy(NextPlanTimeStrategyEnum.FIXED.getCode());
+        task.setNextPlanTime(new Date());
+        task.setParameters("{\"name\":\"order-1001\"}");
+        com.smart.retry.core.cache.RetryCache.put("inherited-generic-listener",
+                RetryTaskObject.of()
+                        .withTaskCode("inherited-generic-listener")
+                        .withBeanObj(listener)
+                        .withRetryType(RetryTaskTypeEnum.CLASS));
+
+        new DefaultInnovation(task, configuration).invoke();
+
+        Assertions.assertNotNull(consumedParam.get());
+        Assertions.assertEquals(ParentParam.class, consumedParam.get().getClass(),
+                "监听器泛型参数从父类继承时必须按父类声明的业务类型反序列化");
+        Assertions.assertEquals("order-1001", ((ParentParam) consumedParam.get()).getName());
+    }
+
     private RetryConfiguration configuration(RetryTaskAccess taskAccess) {
         return (RetryConfiguration) Proxy.newProxyInstance(
                 RetryConfiguration.class.getClassLoader(),
@@ -155,6 +196,34 @@ public class DefaultInnovationTest {
             }
             consumeCompleted.set(true);
             return ExecuteResultStatus.SUCCESS;
+        }
+    }
+
+    private static class ParentParam {
+        private String name;
+
+        String getName() {
+            return name;
+        }
+    }
+
+    private static class ParentListener implements RetryListener<ParentParam> {
+        private final AtomicReference<Object> consumedParam;
+
+        ParentListener(AtomicReference<Object> consumedParam) {
+            this.consumedParam = consumedParam;
+        }
+
+        @Override
+        public ExecuteResultStatus consume(ParentParam param) {
+            consumedParam.set(param);
+            return ExecuteResultStatus.SUCCESS;
+        }
+    }
+
+    private static class ChildListener extends ParentListener {
+        ChildListener(AtomicReference<Object> consumedParam) {
+            super(consumedParam);
         }
     }
 }

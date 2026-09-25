@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.framework.AopProxyUtils;
 import org.springframework.aop.support.AopUtils;
+import org.springframework.core.ResolvableType;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -425,30 +426,23 @@ public class DefaultInnovation implements SmartInnovation {
      */
 
     private Type getRealType(RetryTaskObject taskObject) {
-
-
         Object targetObj = taskObject.getTargetObj();
         Class<?> clazz = targetObj.getClass();
         //判断对象是否是代理对象
         if (AopUtils.isAopProxy(targetObj)) {
             clazz = AopUtils.getTargetClass(targetObj);
         }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            if (genericInterface instanceof ParameterizedType) {
-                ParameterizedType pt = (ParameterizedType) genericInterface;
-                if (pt.getRawType() == RetryListener.class) {
-                    Type[] args = pt.getActualTypeArguments();
-                    if (args.length > 0) {
-                        Type targetType = args[0];
 
-                        // 不要试图转成 Class！保留完整的 Type（可能是 ParameterizedType）
-                        // 例如：TestModel<String>、List<Map<String, Object>> 等都能正确表示
-
-                        LOGGER.debug("[getRealType] Resolved generic type: {}", targetType.getTypeName());
-                        return targetType;
-                    }
-                }
-            }
+        // ResolvableType 会沿父类和接口继承链解析 RetryListener<T>，
+        // 避免业务监听器把泛型声明抽到抽象父类时被降级成 Object。
+        ResolvableType genericType = ResolvableType.forClass(clazz)
+                .as(RetryListener.class)
+                .getGeneric(0);
+        if (genericType != ResolvableType.NONE) {
+            // 保留完整 Type，支持 TestModel<String>、List<Map<String, Object>> 等嵌套泛型。
+            Type targetType = genericType.getType();
+            LOGGER.debug("[getRealType] Resolved generic type: {}", targetType.getTypeName());
+            return targetType;
         }
 
         LOGGER.warn("[getRealType] Failed to resolve generic type for: {}", clazz.getName());
