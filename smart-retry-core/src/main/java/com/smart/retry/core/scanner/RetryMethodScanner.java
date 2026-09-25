@@ -3,6 +3,7 @@ package com.smart.retry.core.scanner;
 import com.google.common.collect.Maps;
 import com.smart.retry.common.annotation.RetryOnMethod;
 import com.smart.retry.common.constant.RetryTaskTypeEnum;
+import com.smart.retry.common.exception.RetryException;
 import com.smart.retry.common.model.RetryTaskObject;
 import com.smart.retry.common.scanner.RetryScanner;
 import com.smart.retry.core.cache.RetryCache;
@@ -58,6 +59,7 @@ public class RetryMethodScanner implements RetryScanner {
 
         methodTMap.forEach((method, retryOnMethod) -> {
             String taskCode = method.getDeclaringClass().getName() + "#" + method.getName();
+            checkExceptionConfiguration(taskCode, retryOnMethod);
             boolean hasTransactional = method.isAnnotationPresent(Transactional.class) ||
                     method.getDeclaringClass().isAnnotationPresent(Transactional.class);
             Object proxy = bean;
@@ -78,6 +80,19 @@ public class RetryMethodScanner implements RetryScanner {
                             .withRetryType(RetryTaskTypeEnum.METHOD);
             RetryCache.put(taskCode, retryTaskObject);
         });
+    }
+
+    static void checkExceptionConfiguration(String taskCode, RetryOnMethod retryOnMethod) {
+        for (Class<? extends Throwable> include : retryOnMethod.include()) {
+            for (Class<? extends Throwable> exclude : retryOnMethod.exclude()) {
+                if (include.equals(exclude) || include.isAssignableFrom(exclude)
+                        || exclude.isAssignableFrom(include)) {
+                    throw new RetryException(String.format(
+                            "retry task %s include and exclude exception types overlap: include=%s, exclude=%s",
+                            taskCode, include.getName(), exclude.getName()));
+                }
+            }
+        }
     }
 
 }
