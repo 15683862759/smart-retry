@@ -38,6 +38,30 @@ public class MybatisAccessTest {
                 saved.getNextPlanTime().getTime() >= beforeSave + Integer.MAX_VALUE * 1000L);
     }
 
+    @Test
+    public void testSaveRetryTaskKeepsExplicitNextPlanTime() {
+        final AtomicReference<RetryTaskDO> savedTask = new AtomicReference<>();
+        RetryTaskRepo repo = proxy(new RecordingHandler(savedTask));
+        MybatisAccess access = new MybatisAccess(repo);
+        RetryTask task = new RetryTask();
+        task.setIntervalSecond(0);
+        task.setDelaySecond(10);
+        task.setRetryNum(0);
+        task.setOriginRetryNum(0);
+        task.setStatus(0);
+        task.setShardingKey(0L);
+        task.setNextPlanTimeStrategy(0);
+        Date explicitNextPlanTime = new Date(123456789L);
+        task.setNextPlanTime(explicitNextPlanTime);
+
+        access.saveRetryTask(task);
+
+        RetryTaskDO saved = savedTask.get();
+        Assert.assertNotNull(saved);
+        Assert.assertSame("调用方显式传入的下次执行时间不应被 delaySecond 覆盖",
+                explicitNextPlanTime, saved.getNextPlanTime());
+    }
+
     private RetryTaskRepo proxy(InvocationHandler handler) {
         return (RetryTaskRepo) Proxy.newProxyInstance(
                 RetryTaskRepo.class.getClassLoader(),

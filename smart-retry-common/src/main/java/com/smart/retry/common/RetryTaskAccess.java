@@ -37,7 +37,8 @@ public interface RetryTaskAccess {
 
     /**
      * 保存重试任务
-     * @param retryTask
+     * @param retryTask 重试任务；{@code nextPlanTime} 非空时必须原样保留，
+     *                  为空时可按 {@code delaySecond} 计算首次执行时间
      * @return
      */
     long saveRetryTask(RetryTask retryTask);
