@@ -13,6 +13,11 @@ public class RetryTaskQuery {
     private List<Integer> statusList;
     private List<Long> shardingKeyList;
     private String taskCode;
+
+    /**
+     * 任务描述模糊查询条件
+     */
+    private String taskDesc;
     private Integer intervalSecond;
     private Date delayTime;
     private Date nextPlanTime;
@@ -75,6 +80,14 @@ public class RetryTaskQuery {
 
     public void setTaskCode(String taskCode) {
         this.taskCode = taskCode;
+    }
+
+    public String getTaskDesc() {
+        return taskDesc;
+    }
+
+    public void setTaskDesc(String taskDesc) {
+        this.taskDesc = taskDesc;
     }
 
     public Integer getIntervalSecond() {

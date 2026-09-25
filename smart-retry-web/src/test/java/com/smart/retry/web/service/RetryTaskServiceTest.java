@@ -3,13 +3,17 @@ package com.smart.retry.web.service;
 import com.smart.retry.common.RetryTaskEnqueuer;
 import com.smart.retry.web.dao.WebRetryShardingDao;
 import com.smart.retry.web.dao.WebRetryTaskDao;
+import com.smart.retry.web.dto.task.TaskQueryRequest;
 import com.smart.retry.web.dto.task.ShardingOptionVO;
+import com.smart.retry.web.entity.query.RetryTaskQuery;
 import com.smart.retry.web.entity.RetryShardingDO;
 import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.lang.reflect.Proxy;
+import java.lang.reflect.Field;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,6 +50,43 @@ public class RetryTaskServiceTest {
 
         Assert.assertEquals(1001, options.size());
         Assert.assertTrue(hasInstance(options, "last-instance"));
+    }
+
+    @Test
+    public void queryTasksPassesTaskDescConditionToDao() throws Exception {
+        AtomicReference<Object> queryRef = new AtomicReference<>();
+        WebRetryTaskDao taskDao = (WebRetryTaskDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryTaskDao.class},
+                (proxy, method, args) -> {
+                    if ("countByQuery".equals(method.getName())) {
+                        queryRef.set(args[0]);
+                        return 0;
+                    }
+                    return null;
+                });
+        WebRetryShardingDao shardingDao = (WebRetryShardingDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryShardingDao.class},
+                (proxy, method, args) -> null);
+        ObjectProvider<RetryTaskEnqueuer> enqueuerProvider = (ObjectProvider<RetryTaskEnqueuer>) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{ObjectProvider.class},
+                (proxy, method, args) -> null);
+
+        TaskQueryRequest request = new TaskQueryRequest();
+        request.setTaskDesc("订单");
+
+        new RetryTaskService(taskDao, shardingDao, enqueuerProvider).queryTasks(request);
+
+        Assert.assertNotNull(queryRef.get());
+        try {
+            Field taskDescField = RetryTaskQuery.class.getDeclaredField("taskDesc");
+            taskDescField.setAccessible(true);
+            Assert.assertEquals("订单", taskDescField.get(queryRef.get()));
+        } catch (NoSuchFieldException e) {
+            Assert.fail("查询对象缺少 taskDesc 条件");
+        }
     }
 
     private WebRetryShardingDao proxyShardingDao(List<RetryShardingDO> firstPage,
