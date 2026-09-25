@@ -1,5 +1,6 @@
 package com.smart.retry.web.service;
 
+import com.smart.retry.common.utils.IpUtils;
 import com.smart.retry.web.dao.WebRetryShardingDao;
 import com.smart.retry.web.entity.RetryShardingDO;
 import com.smart.retry.web.dto.PageResult;
@@ -64,7 +65,7 @@ public class RetryInstanceService {
     @Transactional(rollbackFor = Exception.class)
     public void updateInstance(InstanceUpdateRequest request) {
         // 校验instanceId格式
-        if (!request.getInstanceId().matches("^\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+$")) {
+        if (!IpUtils.isIPLegal(request.getInstanceId())) {
             throw new BusinessException(400, "instanceId必须是ip:port格式，例如：192.168.1.100:8080");
         }
         

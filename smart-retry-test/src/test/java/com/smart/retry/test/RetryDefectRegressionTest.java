@@ -11,6 +11,7 @@ import com.smart.retry.common.model.RetryTaskBuilder;
 import com.smart.retry.common.utils.IpUtils;
 import com.smart.retry.core.ShardingContextHolder;
 import com.smart.retry.web.dto.Result;
+import com.smart.retry.web.dto.instance.InstanceUpdateRequest;
 import com.smart.retry.web.dto.task.TaskCreateRequest;
 import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.dao.WebRetryShardingDao;
@@ -19,6 +20,7 @@ import com.smart.retry.web.dto.task.TaskUpdateRequest;
 import com.smart.retry.web.exception.BusinessException;
 import com.smart.retry.web.exception.GlobalExceptionHandler;
 import com.smart.retry.web.service.RetryTaskService;
+import com.smart.retry.web.service.RetryInstanceService;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -55,6 +57,9 @@ public class RetryDefectRegressionTest extends AbstractTest {
 
     @Autowired
     private RetryTaskService retryTaskService;
+
+    @Autowired
+    private RetryInstanceService retryInstanceService;
 
     @Autowired
     private ObjectProvider<RetryTaskEnqueuer> retryTaskEnqueuerProvider;
@@ -213,6 +218,22 @@ public class RetryDefectRegressionTest extends AbstractTest {
                 IpUtils.isIPLegal("1.1.1.1:8080"));
         Assert.assertFalse("非法端口不应通过",
                 IpUtils.isIPLegal("1.1.1.1:99999"));
+    }
+
+    @Test
+    public void testUpdateInstanceRejectsOutOfRangeIpPort() {
+        InstanceUpdateRequest request = new InstanceUpdateRequest();
+        request.setId(1L);
+        request.setInstanceId("999.999.999.999:99999");
+
+        try {
+            retryInstanceService.updateInstance(request);
+            Assert.fail("非法IP和端口不应通过实例更新校验");
+        } catch (BusinessException expected) {
+            Assert.assertEquals(Integer.valueOf(400), expected.getCode());
+            Assert.assertEquals("instanceId必须是ip:port格式，例如：192.168.1.100:8080",
+                    expected.getMessage());
+        }
     }
 
     @Test
