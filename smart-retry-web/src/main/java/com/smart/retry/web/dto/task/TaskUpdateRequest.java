@@ -1,6 +1,8 @@
 package com.smart.retry.web.dto.task;
 
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.Max;
 import lombok.Data;
 
 /**
@@ -14,9 +16,12 @@ public class TaskUpdateRequest {
     
     private String nextPlanTime;
     
+    @Min(value = 1, message = "retryNum必须大于0")
     private Integer retryNum;
     
     private String param;
     
+    @Min(value = 0, message = "status必须在0-3之间")
+    @Max(value = 3, message = "status必须在0-3之间")
     private Integer status;
 }
