@@ -8,6 +8,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import com.smart.retry.mybatis.dao.RetryTaskDao;
+import com.smart.retry.mybatis.dao.RetryShardingDao;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.lang.reflect.Method;
@@ -30,6 +31,21 @@ public class MapperAndSchemaConsistencyTest {
         }
         Assert.assertTrue(statementIds("postgresql").containsAll(required));
         Assert.assertTrue(statementIds("oracle").containsAll(required));
+    }
+
+    @Test
+    public void testRetryShardingDaoStatementsExistInEveryDatabaseDialect() throws Exception {
+        Set<String> required = new HashSet<>();
+        for (Method method : RetryShardingDao.class.getMethods()) {
+            required.add(method.getName());
+        }
+
+        Assert.assertTrue("MySQL sharding mapper must implement RetryShardingDao",
+                shardingStatementIds("mysql").containsAll(required));
+        Assert.assertTrue("PostgreSQL sharding mapper must implement RetryShardingDao",
+                shardingStatementIds("postgresql").containsAll(required));
+        Assert.assertTrue("Oracle sharding mapper must implement RetryShardingDao",
+                shardingStatementIds("oracle").containsAll(required));
     }
 
     @Test
@@ -134,6 +150,24 @@ public class MapperAndSchemaConsistencyTest {
     private Set<String> statementIds(String dialect) throws Exception {
         Document document = parse(Paths.get(
                 "src/main/resources", dialect, "retry-task-mapper.xml"));
+        Set<String> ids = new HashSet<>();
+        NodeList statements = document.getDocumentElement().getChildNodes();
+        for (int i = 0; i < statements.getLength(); i++) {
+            if (statements.item(i) instanceof Element) {
+                Element statement = (Element) statements.item(i);
+                String tag = statement.getTagName();
+                if ("select".equals(tag) || "insert".equals(tag)
+                        || "update".equals(tag) || "delete".equals(tag)) {
+                    ids.add(statement.getAttribute("id"));
+                }
+            }
+        }
+        return ids;
+    }
+
+    private Set<String> shardingStatementIds(String dialect) throws Exception {
+        Document document = parse(Paths.get(
+                "src/main/resources", dialect, "retry-sharding-mapper.xml"));
         Set<String> ids = new HashSet<>();
         NodeList statements = document.getDocumentElement().getChildNodes();
         for (int i = 0; i < statements.getLength(); i++) {

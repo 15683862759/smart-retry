@@ -44,6 +44,43 @@
 		WHERE instance_id = #{instanceId}
 	</select>
 
+    <!-- 管理端分页查询分片，按创建者和归属实例模糊过滤 -->
+    <select id="selectAllWithPage" resultMap="RetryTaskMAP">
+        SELECT <include refid="all_column"/>
+        FROM retry_sharding
+        <where>
+            <if test="creatorId != null and creatorId != ''">
+                AND creator_id LIKE CONCAT('%', #{creatorId}, '%')
+            </if>
+            <if test="instanceId != null and instanceId != ''">
+                AND instance_id LIKE CONCAT('%', #{instanceId}, '%')
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 管理端统计分片总数，条件与分页查询保持一致 -->
+    <select id="countAll" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM retry_sharding
+        <where>
+            <if test="creatorId != null and creatorId != ''">
+                AND creator_id LIKE CONCAT('%', #{creatorId}, '%')
+            </if>
+            <if test="instanceId != null and instanceId != ''">
+                AND instance_id LIKE CONCAT('%', #{instanceId}, '%')
+            </if>
+        </where>
+    </select>
+
+    <!-- 按主键查询分片 -->
+    <select id="selectById" parameterType="java.lang.Long" resultMap="RetryTaskMAP">
+        SELECT <include refid="all_column"/>
+        FROM retry_sharding
+        WHERE id = #{id}
+    </select>
+
 
 
     <!-- 兼容 PostgreSQL -->
