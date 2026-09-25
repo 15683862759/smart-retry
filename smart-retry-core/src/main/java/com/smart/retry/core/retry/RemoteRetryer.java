@@ -98,8 +98,10 @@ public class RemoteRetryer implements IRetryer {
             return;
         }
 
-        // 将任务加入 DelayQueue 精准调度（窗口内才入队）
-        SimpleContainer.getContainer(retryConfiguration).enqueueIfInWindow(retryTask);
+        // 将任务加入 DelayQueue 精准调度（窗口内才入队）。
+        // 业务方法可能处于事务中，必须等事务提交后再入队，
+        // 避免回滚后留下 DB 已消失但内存仍会消费的幽灵任务。
+        SimpleContainer.getContainer(retryConfiguration).enqueueAfterCommit(retryTask);
 
     }
 

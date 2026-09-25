@@ -9,8 +9,11 @@ import com.smart.retry.common.model.RetryTask;
 import com.smart.retry.common.serializer.SmartSerializer;
 import com.smart.retry.core.ShardingContextHolder;
 import com.smart.retry.core.SimpleContainer;
+import com.smart.retry.core.RetryTaskCache;
 import com.smart.retry.core.config.SmartExecutorConfigure;
 import com.smart.retry.core.serializer.JsonSerializer;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.aopalliance.intercept.MethodInvocation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -34,6 +37,10 @@ public class RemoteRetryerTest {
 
     @AfterEach
     void tearDown() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        RetryTaskCache.clear();
         if (container != null) {
             container.destroy();
             container = null;
@@ -64,8 +71,41 @@ public class RemoteRetryerTest {
                 "最大 int 秒首次延迟不应回绕成过去时间");
     }
 
+    @Test
+    void testRegisterTaskEnqueuesOnlyAfterCommit() throws Throwable {
+        TransactionSynchronizationManager.initSynchronization();
+
+        final AtomicReference<RetryTask> savedTask = new AtomicReference<>();
+        RetryConfiguration configuration = new TestConfiguration(taskAccessProxy(savedTask));
+        container = new SimpleContainer(configuration, new SmartExecutorConfigure());
+
+        Method method = getClass().getDeclaredMethod("immediateRetryTarget");
+        RetryOnMethod retryable = method.getAnnotation(RetryOnMethod.class);
+        MethodInvocation invocation = new TestMethodInvocation(method);
+        RetryAttemptContext context = new RetryAttemptContext();
+        context.setMethod(method);
+        context.setRetryable(retryable);
+
+        new RemoteRetryer(configuration, invocation, retryable, context).retry();
+
+        Assertions.assertNotNull(savedTask.get());
+        Assertions.assertEquals(0, RetryTaskCache.size(),
+                "事务未提交前不应把任务放入内存队列");
+
+        for (TransactionSynchronization synchronization : TransactionSynchronizationManager.getSynchronizations()) {
+            synchronization.afterCommit();
+        }
+
+        Assertions.assertEquals(1, RetryTaskCache.size(),
+                "事务提交后应把任务放入内存队列");
+    }
+
     @RetryOnMethod(maxAttempt = 2, firstDelaySecond = Integer.MAX_VALUE)
     private void retryTarget() {
+    }
+
+    @RetryOnMethod(maxAttempt = 2, firstDelaySecond = 0)
+    private void immediateRetryTarget() {
     }
 
     private RetryTaskAccess taskAccessProxy(AtomicReference<RetryTask> savedTask) {
