@@ -245,7 +245,12 @@ public class RetryTaskService {
             taskDO.setStatus(newStatus);
         }
         
-        int updated = webRetryTaskDao.update(taskDO);
+        int updated;
+        try {
+            updated = webRetryTaskDao.update(taskDO);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(400, "相同参数的活跃任务已存在");
+        }
         if (updated == 0) {
             throw new BusinessException("任务状态已变化，更新失败");
         }

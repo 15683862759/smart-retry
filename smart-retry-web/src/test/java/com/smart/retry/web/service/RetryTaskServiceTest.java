@@ -4,9 +4,13 @@ import com.smart.retry.common.RetryTaskEnqueuer;
 import com.smart.retry.web.dao.WebRetryShardingDao;
 import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.dto.task.TaskQueryRequest;
+import com.smart.retry.web.dto.task.TaskUpdateRequest;
 import com.smart.retry.web.dto.task.ShardingOptionVO;
+import com.smart.retry.web.entity.RetryTaskDO;
 import com.smart.retry.web.entity.query.RetryTaskQuery;
 import com.smart.retry.web.entity.RetryShardingDO;
+import com.smart.retry.web.exception.BusinessException;
+import org.springframework.dao.DuplicateKeyException;
 import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -118,6 +122,45 @@ public class RetryTaskServiceTest {
 
         Assert.assertNotNull(queryRef.get());
         Assert.assertEquals("custom", ((RetryTaskQuery) queryRef.get()).getCreator());
+    }
+
+    @Test
+    public void updateTaskTranslatesDuplicateUniqueKeyToBusinessException() {
+        RetryTaskDO task = new RetryTaskDO();
+        task.setTaskCode("duplicate-task");
+        task.setParameters("{}");
+        WebRetryTaskDao taskDao = (WebRetryTaskDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryTaskDao.class},
+                (proxy, method, args) -> {
+                    if ("selectById".equals(method.getName())) {
+                        return task;
+                    }
+                    if ("update".equals(method.getName())) {
+                        throw new DuplicateKeyException("unique key conflict");
+                    }
+                    return null;
+                });
+        WebRetryShardingDao shardingDao = (WebRetryShardingDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryShardingDao.class},
+                (proxy, method, args) -> null);
+        ObjectProvider<RetryTaskEnqueuer> enqueuerProvider = (ObjectProvider<RetryTaskEnqueuer>) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{ObjectProvider.class},
+                (proxy, method, args) -> null);
+
+        TaskUpdateRequest request = new TaskUpdateRequest();
+        request.setId(1L);
+        request.setParam("{\"value\":\"duplicate\"}");
+
+        try {
+            new RetryTaskService(taskDao, shardingDao, enqueuerProvider).updateTask(request);
+            Assert.fail("参数冲突应转换为业务异常");
+        } catch (BusinessException e) {
+            Assert.assertEquals(Integer.valueOf(400), e.getCode());
+            Assert.assertEquals("相同参数的活跃任务已存在", e.getMessage());
+        }
     }
 
     private WebRetryShardingDao proxyShardingDao(List<RetryShardingDO> firstPage,
