@@ -71,18 +71,19 @@
     <!-- 重写 scrambleDeadSharding 以适应 Oracle 语法 -->
     <update id="scrambleDeadSharding" >
         <!-- 使用子查询方式更新，兼容 Oracle -->
-        UPDATE retry_sharding rs
+        UPDATE retry_sharding
         SET
-        rs.status = #{status},
-        rs.instance_id = #{instanceId},
-        rs.last_heartbeat = SYSDATE
-        WHERE rs.id = (
+        status = #{status},
+        instance_id = #{instanceId},
+        last_heartbeat = SYSDATE
+        WHERE id = (
         SELECT id FROM (
         SELECT id
         FROM retry_sharding
         WHERE last_heartbeat &lt; SYSDATE - (#{timeout} / 86400)
         ORDER BY id
         ) WHERE ROWNUM = 1
+        )
     </update>
 
     <update id="updateLastHeartbeat">

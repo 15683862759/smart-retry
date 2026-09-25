@@ -87,6 +87,20 @@ public class MapperAndSchemaConsistencyTest {
         }
     }
 
+    @Test
+    public void testOracleScrambleDeadShardingUsesOracleUpdateSyntax() throws Exception {
+        Document document = parse(Paths.get(
+                "src/main/resources/oracle/retry-sharding-mapper.xml"));
+        Element scramble = statement(document, "scrambleDeadSharding");
+        String sql = text(scramble);
+
+        Assert.assertFalse("Oracle UPDATE SET clauses must not qualify columns with a table alias",
+                Pattern.compile("SET\\s+rs\\.", Pattern.CASE_INSENSITIVE).matcher(sql).find());
+        Assert.assertTrue("Oracle UPDATE should target retry_sharding without a table alias",
+                Pattern.compile("UPDATE\\s+retry_sharding\\s+SET",
+                        Pattern.CASE_INSENSITIVE).matcher(sql).find());
+    }
+
     private Set<String> statementIds(String dialect) throws Exception {
         Document document = parse(Paths.get(
                 "src/main/resources", dialect, "retry-task-mapper.xml"));
