@@ -25,7 +25,7 @@ public class RetryTaskController {
      * 分页查询任务列表
      */
     @PostMapping("/query")
-    public Result<PageResult<TaskVO>> queryTasks(@RequestBody TaskQueryRequest request) {
+    public Result<PageResult<TaskVO>> queryTasks(@Valid @RequestBody TaskQueryRequest request) {
         PageResult<TaskVO> result = retryTaskService.queryTasks(request);
         return Result.success(result);
     }

@@ -24,7 +24,7 @@ public class RetryInstanceController {
      * 分页查询实例列表
      */
     @PostMapping("/query")
-    public Result<PageResult<InstanceVO>> queryInstances(@RequestBody InstanceQueryRequest request) {
+    public Result<PageResult<InstanceVO>> queryInstances(@Valid @RequestBody InstanceQueryRequest request) {
         PageResult<InstanceVO> result = retryInstanceService.queryInstances(request);
         return Result.success(result);
     }
