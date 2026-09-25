@@ -51,7 +51,11 @@ public class RetryMethodScanner implements RetryScanner {
             if (beanFactory.getBeanDefinition(beanName).isAbstract()) {
                 continue;
             }
-            Class<?> beanType = beanFactory.getType(beanName, false);
+            // Bean Definition 的声明类型不受 BeanPostProcessor 生成的 JDK 代理影响。
+            Class<?> beanType = beanFactory.getBeanDefinition(beanName).getResolvableType().resolve();
+            if (beanType == null) {
+                beanType = beanFactory.getType(beanName, false);
+            }
             if (beanType == null || findRetryMethods(beanType).isEmpty()) {
                 continue;
             }
@@ -97,7 +101,8 @@ public class RetryMethodScanner implements RetryScanner {
      * @param applicationContext Spring 上下文，用于事务代理目标对象解析
      */
     private void resolveMethodAnnotation(Object bean,ApplicationContext applicationContext) {
-        Map<Method, RetryOnMethod> methodTMap = findRetryMethods(bean.getClass());
+        // JDK 代理类自身没有目标方法上的注解，必须回到 AOP 目标类型解析。
+        Map<Method, RetryOnMethod> methodTMap = findRetryMethods(AopUtils.getTargetClass(bean));
         if (methodTMap == null || methodTMap.isEmpty()) {
             return;
         }

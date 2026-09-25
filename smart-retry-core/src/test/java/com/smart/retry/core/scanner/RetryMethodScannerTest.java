@@ -9,6 +9,9 @@ import com.smart.retry.core.cache.RetryCache;
 import com.smart.retry.core.util.RetryTaskCodeBuilder;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -135,6 +138,26 @@ public class RetryMethodScannerTest {
         }
     }
 
+    @Test
+    void scanRegistersRetryMethodOnJdkProxyBean() {
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext();
+        applicationContext.register(ProxiedRetryConfiguration.class);
+        applicationContext.refresh();
+        String taskCode = ProxiedRetryTarget.class.getName() + "#execute";
+        try {
+            Object bean = applicationContext.getBean("proxiedRetryTarget");
+
+            Assertions.assertTrue(AopUtils.isAopProxy(bean));
+            new RetryMethodScanner().scan(applicationContext);
+
+            Assertions.assertNotNull(RetryCache.get(taskCode),
+                    "JDK proxy Bean 上的 @RetryOnMethod 不能丢失注册");
+        } finally {
+            RetryCache.remove(taskCode);
+            applicationContext.close();
+        }
+    }
+
     private static Method method(String name) {
         Method method = Assertions.assertDoesNotThrow(() -> RetryMethodScannerTest.class.getDeclaredMethod(name));
         Assertions.assertNotNull(method.getAnnotation(RetryOnMethod.class));
@@ -213,6 +236,45 @@ public class RetryMethodScannerTest {
 
         @RetryOnMethod(intervalSecond = -1)
         public void execute() {
+        }
+    }
+
+    @Configuration
+    static class ProxiedRetryConfiguration {
+
+        @Bean
+        static RetryProxyBeanPostProcessor retryProxyBeanPostProcessor() {
+            return new RetryProxyBeanPostProcessor();
+        }
+
+        @Bean
+        ProxiedRetryTarget proxiedRetryTarget() {
+            return new ProxiedRetryTarget();
+        }
+    }
+
+    interface ProxiedRetryApi {
+
+        void execute();
+    }
+
+    static class ProxiedRetryTarget implements ProxiedRetryApi {
+
+        @RetryOnMethod
+        public void execute() {
+        }
+    }
+
+    static class RetryProxyBeanPostProcessor implements BeanPostProcessor {
+
+        @Override
+        public Object postProcessAfterInitialization(Object bean, String beanName) {
+            if (!"proxiedRetryTarget".equals(beanName)) {
+                return bean;
+            }
+            ProxyFactory proxyFactory = new ProxyFactory(bean);
+            proxyFactory.setInterfaces(ProxiedRetryApi.class);
+            return proxyFactory.getProxy();
         }
     }
 
