@@ -18,10 +18,9 @@ public class RetryCache {
 
     public static void put(String key, RetryTaskObject retryTaskObject) {
         String errFormat = "retry task {} already exists in cache";
-        if(RETRY_CACHE.containsKey(key)) {
+        if (RETRY_CACHE.putIfAbsent(key, retryTaskObject) != null) {
             throw new RetryException(String.format(errFormat, key));
         }
-        RETRY_CACHE.put(key, retryTaskObject);
     }
 
     public static RetryTaskObject get(String key) {
