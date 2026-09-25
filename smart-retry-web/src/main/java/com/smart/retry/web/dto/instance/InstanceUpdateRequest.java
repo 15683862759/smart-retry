@@ -1,6 +1,7 @@
 package com.smart.retry.web.dto.instance;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
 import lombok.Data;
 
@@ -10,6 +11,7 @@ import lombok.Data;
 @Data
 public class InstanceUpdateRequest {
     
+    @NotNull(message = "id不能为空")
     private Long id;
     
     @NotBlank(message = "instanceId不能为空")
