@@ -370,6 +370,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
      * @return true=入队成功，false=未入队（已在内存中或已达内存上限）
      */
     public synchronized boolean enqueue(RetryTask task) {
+        if (!containerRunning) {
+            return false;
+        }
         String key = getUniqueKey(task);
         // 内存上限精确控制 + 去重：两者在同一把锁内原子完成，并发下内存任务数不会超过 maxInMemory
         if (!RetryTaskCache.tryMarkIfBelowLimit(key, smartConfigure.getMaxInMemory())) {

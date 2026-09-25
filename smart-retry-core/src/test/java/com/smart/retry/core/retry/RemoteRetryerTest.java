@@ -78,6 +78,7 @@ public class RemoteRetryerTest {
         final AtomicReference<RetryTask> savedTask = new AtomicReference<>();
         RetryConfiguration configuration = new TestConfiguration(taskAccessProxy(savedTask));
         container = new SimpleContainer(configuration, new SmartExecutorConfigure());
+        container.start();
 
         Method method = getClass().getDeclaredMethod("immediateRetryTarget");
         RetryOnMethod retryable = method.getAnnotation(RetryOnMethod.class);

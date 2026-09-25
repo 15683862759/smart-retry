@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
@@ -142,6 +143,25 @@ public class SimpleContainerLifecycleTest {
         Assertions.assertThrows(IllegalStateException.class,
                 () -> SimpleContainer.getContainer(configuration),
                 "未启动容器销毁后也应从配置绑定表中移除");
+    }
+
+    @Test
+    void enqueueAfterContainerDestroyDoesNotLeaveMemoryMark() {
+        SmartExecutorConfigure configure = new SmartExecutorConfigure();
+        configure.setTaskFindInterval(1);
+        SimpleContainer container = new SimpleContainer(
+                new TestConfiguration(emptyTaskAccess()), configure);
+        container.start();
+        container.destroy();
+
+        RetryTask task = new RetryTask();
+        task.setTaskCode("destroyed-container-task");
+        task.setUniqueKey("task");
+        task.setNextPlanTime(new Date());
+        container.enqueueAfterCommit(task);
+
+        Assertions.assertEquals(0, RetryTaskCache.size(),
+                "容器销毁后不应把任务重新放入内存队列或留下脏去重键");
     }
 
     @Test
