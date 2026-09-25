@@ -115,6 +115,9 @@ public class SmartExecutorConfigure {
         }
 
         public void setEnabled(Boolean enabled) {
+            if (enabled == null) {
+                throw new IllegalArgumentException("clear task enabled must not be null");
+            }
             this.enabled = enabled;
         }
 
@@ -171,6 +174,9 @@ public class SmartExecutorConfigure {
         }
 
         public void setDeadTaskCheck(Boolean deadTaskCheck) {
+            if (deadTaskCheck == null) {
+                throw new IllegalArgumentException("dead task check must not be null");
+            }
             this.deadTaskCheck = deadTaskCheck;
         }
 
@@ -324,6 +330,9 @@ public class SmartExecutorConfigure {
         }
 
         public void setKeepAliveSeconds(int keepAliveSeconds) {
+            if (keepAliveSeconds < 1) {
+                throw new IllegalArgumentException("keepAliveSeconds must be greater than 0");
+            }
             this.keepAliveSeconds = keepAliveSeconds;
         }
     }

@@ -43,4 +43,42 @@ public class SmartExecutorConfigureTest {
 
         Assertions.assertEquals(1, deadTask.getTaskMaxExecuteTimeout());
     }
+
+    @Test
+    void rejectsNullBooleanSwitches() {
+        SmartExecutorConfigure.ClearTask clearTask = new SmartExecutorConfigure.ClearTask();
+        SmartExecutorConfigure.DeadTask deadTask = new SmartExecutorConfigure.DeadTask();
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> clearTask.setEnabled(null));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> deadTask.setDeadTaskCheck(null));
+    }
+
+    @Test
+    void acceptsBooleanSwitches() {
+        SmartExecutorConfigure.ClearTask clearTask = new SmartExecutorConfigure.ClearTask();
+        SmartExecutorConfigure.DeadTask deadTask = new SmartExecutorConfigure.DeadTask();
+
+        clearTask.setEnabled(true);
+        deadTask.setDeadTaskCheck(false);
+
+        Assertions.assertTrue(clearTask.getEnabled());
+        Assertions.assertFalse(deadTask.getDeadTaskCheck());
+    }
+
+    @Test
+    void rejectsInvalidExecutorKeepAliveSeconds() {
+        SmartExecutorConfigure.Executor executor = new SmartExecutorConfigure.Executor();
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> executor.setKeepAliveSeconds(0));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> executor.setKeepAliveSeconds(-1));
+    }
+
+    @Test
+    void acceptsPositiveExecutorKeepAliveSeconds() {
+        SmartExecutorConfigure.Executor executor = new SmartExecutorConfigure.Executor();
+
+        executor.setKeepAliveSeconds(1);
+
+        Assertions.assertEquals(1, executor.getKeepAliveSeconds());
+    }
 }
