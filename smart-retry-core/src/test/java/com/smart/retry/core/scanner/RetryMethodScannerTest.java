@@ -69,6 +69,23 @@ public class RetryMethodScannerTest {
     }
 
     @Test
+    void scanRejectsBlankClassTaskCode() {
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext();
+        applicationContext.register(BlankTaskCodeListener.class);
+        applicationContext.refresh();
+        try {
+            RetryException exception = Assertions.assertThrows(RetryException.class,
+                    () -> new RetryClassScanner().scan(applicationContext));
+
+            Assertions.assertTrue(exception.getMessage().contains("taskCode"));
+            Assertions.assertNull(RetryCache.get(""));
+        } finally {
+            RetryCache.remove("");
+            applicationContext.close();
+        }
+    }
+
+    @Test
     void acceptsIndependentIncludeAndExcludeTypes() throws Exception {
         Method method = method("independentTypes");
 
@@ -196,6 +213,14 @@ public class RetryMethodScannerTest {
 
         @RetryOnMethod(intervalSecond = -1)
         public void execute() {
+        }
+    }
+
+    @RetryOnClass(taskCode = "")
+    static class BlankTaskCodeListener implements RetryListener<String> {
+        @Override
+        public ExecuteResultStatus consume(String param) {
+            return ExecuteResultStatus.SUCCESS;
         }
     }
 

@@ -55,6 +55,10 @@ public class RetryClassScanner implements RetryScanner {
         if (retryableOnClass == null) {
             return;
         }
+        if (StringUtils.isBlank(retryableOnClass.taskCode())) {
+            throw new RetryException(String.format(
+                    "retry listener %s taskCode must not be blank", bean.getClass().getName()));
+        }
         RetryTaskObject retryTaskObject =
                 RetryTaskObject.of().withBeanObj(bean)
                         .withRetryTaskNotify(retryableOnClass.retryTaskNotifies())
