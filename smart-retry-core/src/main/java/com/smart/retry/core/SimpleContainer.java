@@ -9,7 +9,6 @@ import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.common.model.RetryTask;
 import com.smart.retry.common.utils.GsonTool;
 import com.smart.retry.common.utils.LogIdUtils;
-import com.smart.retry.common.utils.LogIdUtils;
 import com.smart.retry.common.exception.RetryTaskClaimedException;
 import com.smart.retry.common.model.TaskExecutionResult;
 import com.smart.retry.core.cache.RetryCache;
@@ -27,6 +26,7 @@ import org.springframework.util.CollectionUtils;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 /**
@@ -38,63 +38,94 @@ public class SimpleContainer implements RetryContainer {
 
     private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(SimpleContainer.class);
 
+    /** 每个 RetryConfiguration 只对应一个容器实例，供 Operator/Retryer 查找自己的调度上下文。 */
+    private static final Map<RetryConfiguration, SimpleContainer> CONTAINERS =
+            new ConcurrentHashMap<>();
+
     // ========== DelayQueue 精准调度相关字段 ==========
 
     /**
      * 内存精准调度队列
      */
-    private static final DelayQueue<ScheduledTask> delayQueue = new DelayQueue<>();
+    private final DelayQueue<ScheduledTask> delayQueue = new DelayQueue<>();
 
     /**
      * 调度线程
      */
-    private static Thread schedulerThread;
+    private Thread schedulerThread;
 
-    private static Thread producerThread;
+    private Thread producerThread;
 
-    private static Thread deadLetterThread;
+    private Thread deadLetterThread;
 
-    private static volatile boolean containerRunning;
+    private volatile boolean containerRunning;
 
     /**
      * 预加载窗口毫秒数
      */
-    private static volatile long preloadWindowMs;
+    private volatile long preloadWindowMs;
 
-    private static RetryConfiguration retryConfiguration;
+    private final RetryConfiguration retryConfiguration;
 
-    private static SmartExecutorConfigure smartConfigure;
+    private final SmartExecutorConfigure smartConfigure;
 
-    private static ThreadPoolExecutor consumerExecutor;
+    private ThreadPoolExecutor consumerExecutor;
 
-    private static BlockingQueue<Runnable> consumerQueue;
+    private BlockingQueue<Runnable> consumerQueue;
 
-    private static ThreadPoolTaskScheduler taskScheduler;
+    private ThreadPoolTaskScheduler taskScheduler;
 
     public SimpleContainer(RetryConfiguration retryConfiguration, SmartExecutorConfigure smartExecutorConfigure) {
         this.retryConfiguration = retryConfiguration;
         this.smartConfigure = smartExecutorConfigure;
+        CONTAINERS.put(retryConfiguration, this);
     }
 
 
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (schedulerThread != null) {
-                schedulerThread.interrupt();
-            }
-            if (consumerExecutor != null) {
-                consumerExecutor.shutdown();
-            }
-            if (taskScheduler != null) {
-                taskScheduler.shutdown();
+            for (SimpleContainer container : CONTAINERS.values()) {
+                container.shutdownNow();
             }
         }));
+    }
+
+    /**
+     * 获取指定配置绑定的容器。
+     *
+     * @param configuration 重试配置
+     * @return 绑定容器；未注册时抛出 IllegalStateException
+     */
+    public static SimpleContainer getContainer(RetryConfiguration configuration) {
+        SimpleContainer container = CONTAINERS.get(configuration);
+        if (container == null) {
+            throw new IllegalStateException("No SimpleContainer bound to RetryConfiguration");
+        }
+        return container;
+    }
+
+    private void shutdownNow() {
+        if (schedulerThread != null) {
+            schedulerThread.interrupt();
+        }
+        if (producerThread != null) {
+            producerThread.interrupt();
+        }
+        if (deadLetterThread != null) {
+            deadLetterThread.interrupt();
+        }
+        if (consumerExecutor != null) {
+            consumerExecutor.shutdown();
+        }
+        if (taskScheduler != null) {
+            taskScheduler.shutdown();
+        }
     }
 
 
     @Override
     public void start() {
-        synchronized (SimpleContainer.class) {
+        synchronized (this) {
             if (containerRunning) {
                 return;
             }
@@ -128,7 +159,7 @@ public class SimpleContainer implements RetryContainer {
     }
 
 
-    private synchronized static void initTaskExecutor(SmartExecutorConfigure smartConfigure) {
+    private synchronized void initTaskExecutor(SmartExecutorConfigure smartConfigure) {
 
         if (consumerExecutor != null) {
             return;
@@ -166,7 +197,7 @@ public class SimpleContainer implements RetryContainer {
 
     @Override
     public void destroy() {
-        synchronized (SimpleContainer.class) {
+        synchronized (this) {
             if (!containerRunning) {
                 return;
             }
@@ -243,7 +274,7 @@ public class SimpleContainer implements RetryContainer {
      * @param task 重试任务
      * @return true=入队成功，false=未入队（已在内存中或已达内存上限）
      */
-    public synchronized static boolean enqueue(RetryTask task) {
+    public synchronized boolean enqueue(RetryTask task) {
         String key = getUniqueKey(task);
         // 内存上限精确控制 + 去重：两者在同一把锁内原子完成，并发下内存任务数不会超过 maxInMemory
         if (!RetryTaskCache.tryMarkIfBelowLimit(key, smartConfigure.getMaxInMemory())) {
@@ -259,7 +290,7 @@ public class SimpleContainer implements RetryContainer {
      *
      * @param task 重试任务
      */
-    public static void enqueueIfInWindow(RetryTask task) {
+    public void enqueueIfInWindow(RetryTask task) {
         if (task == null || task.getNextPlanTime() == null) {
             return;
         }
@@ -306,7 +337,7 @@ public class SimpleContainer implements RetryContainer {
      *
      * @param task 已写入 DB 并回填 id 的重试任务
      */
-    public static void enqueueAfterCommit(RetryTask task) {
+    public void enqueueAfterCommit(RetryTask task) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -332,7 +363,7 @@ public class SimpleContainer implements RetryContainer {
      * @param task 已执行完毕的任务
      * @return true=已重新入队等待异步重试，false=已到达终态（unmark）
      */
-    static boolean afterExecute(RetryTask task) {
+    boolean afterExecute(RetryTask task) {
 
         String key = getUniqueKey(task);
         Integer status = task.getStatus();
@@ -369,7 +400,7 @@ public class SimpleContainer implements RetryContainer {
         return true;
     }
 
-    private static boolean isInWindow(Date nextPlanTime) {
+    private boolean isInWindow(Date nextPlanTime) {
         long effectiveWindowMs = preloadWindowMs;
         // 防御：容器未启动时 preloadWindowMs 为 0，回退到配置值计算
         if (effectiveWindowMs <= 0) {
@@ -387,7 +418,7 @@ public class SimpleContainer implements RetryContainer {
      * @param task 待执行任务
      * @return true=可以执行，false=跳过该任务
      */
-    static boolean validateTaskInDB(RetryTask task) {
+    boolean validateTaskInDB(RetryTask task) {
         try {
             RetryTask dbTask = retryConfiguration.getRetryTaskAcess().getRetryTask(task.getId());
             if (dbTask == null) {
@@ -460,7 +491,7 @@ public class SimpleContainer implements RetryContainer {
      * @param task 待执行任务
      * @return true=当前实例负责该分片
      */
-    private static boolean checkShardingInMemory(RetryTask task) {
+    private boolean checkShardingInMemory(RetryTask task) {
         List<Long> shardingIndexList = ShardingContextHolder.shardingIndex();
         // shardingIndex() 永远返回非 null 的 List，为空表示分片未初始化
         if (shardingIndexList.isEmpty()) {
@@ -627,7 +658,7 @@ public class SimpleContainer implements RetryContainer {
 
     // ========== 原有方法 ==========
 
-    private static void doProduceTask(RetryTask retryTask, RetryConfiguration retryConfiguration) {
+    private void doProduceTask(RetryTask retryTask, RetryConfiguration retryConfiguration) {
         //任务存在则不处理，避免重复处理
         if (checkTaskExists(retryTask)) {
             if (smartConfigure.shouldLogInfo()) {
@@ -639,16 +670,15 @@ public class SimpleContainer implements RetryContainer {
         CompletableFuture<Void> future = CompletableFuture.runAsync(new ConsumerTask(retryTask, retryConfiguration), consumerExecutor);
     }
 
-    private static void initTaskConsumerExecutor(SmartExecutorConfigure smartConfigure) {
+    private void initTaskConsumerExecutor(SmartExecutorConfigure smartConfigure) {
         if (consumerExecutor != null) {
             return;
         }
         initTaskExecutor(smartConfigure);
     }
 
-    static void invokeTaskAsync(RetryTask retryTask,
-                                RetryConfiguration retryConfiguration,
-                                SmartExecutorConfigure smartConfigure) {
+    void invokeTaskAsync(RetryTask retryTask,
+                        RetryConfiguration retryConfiguration) {
         initTaskConsumerExecutor(smartConfigure);
         // 释放 createTask 中 enqueueIfInWindow 预标记的去重 key
         releaseAutoEnqueueMark(retryTask);
@@ -663,8 +693,8 @@ public class SimpleContainer implements RetryContainer {
      * @param retryConfiguration 重试配置
      * @return 本次执行结果；null=未执行（被去重拦截 / getTriggerableTask 拒绝）
      */
-    static TaskExecutionResult invokeTaskOnceSync(RetryTask retryTask,
-                                                  RetryConfiguration retryConfiguration) {
+    TaskExecutionResult invokeTaskOnceSync(RetryTask retryTask,
+                                          RetryConfiguration retryConfiguration) {
         // 释放 createTask 中 enqueueIfInWindow 预标记的去重 key，
         // 确保手动触发能获取执行权（避免被 auto-enqueue 的 tryMark 拦截）
         releaseAutoEnqueueMark(retryTask);
@@ -716,9 +746,9 @@ public class SimpleContainer implements RetryContainer {
      * @Version ConsumerTask.java, v 0.1 2025年08月27日 xiaoqiang
      * @Description: TODO
      */
-    public static class ConsumerTask implements Runnable {
+    class ConsumerTask implements Runnable {
 
-        private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerTask.class);
+        private final Logger LOGGER = LoggerFactory.getLogger(ConsumerTask.class);
 
         private final RetryTask retryTask;
         private final RetryConfiguration retryConfiguration;
@@ -726,7 +756,7 @@ public class SimpleContainer implements RetryContainer {
         /** run() 执行完毕后的结果；未执行（被校验/去重拒绝）时为 null */
         private volatile TaskExecutionResult result;
 
-        public ConsumerTask(RetryTask retryTask, RetryConfiguration retryConfiguration) {
+        ConsumerTask(RetryTask retryTask, RetryConfiguration retryConfiguration) {
             this.retryTask = retryTask;
             this.retryConfiguration = retryConfiguration;
         }
@@ -770,7 +800,7 @@ public class SimpleContainer implements RetryContainer {
             return result;
         }
 
-        private static ExecuteResultStatus resolveStatus(RetryTask task) {
+        private ExecuteResultStatus resolveStatus(RetryTask task) {
             return RetryTaskStatus.SUCCESS.getCode().equals(task.getStatus())
                     ? ExecuteResultStatus.SUCCESS
                     : ExecuteResultStatus.FAIL;

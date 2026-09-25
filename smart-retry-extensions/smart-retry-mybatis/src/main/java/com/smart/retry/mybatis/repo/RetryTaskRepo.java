@@ -86,5 +86,14 @@ public interface RetryTaskRepo {
      * @return 受影响行数
      */
     int restartRetryTask(long taskId, int targetRetryNum, Date nextPlanTime);
+
+    /**
+     * 原子停止重试任务。
+     *
+     * @param taskId 任务 ID
+     * @return 受影响行数：1=停止成功，0=任务已终态或不存在
+     */
+    int stopRetryTask(long taskId);
+
     int deleteByGmtCreate(Date gmtCreate, int limitRows, int status);
 }

@@ -364,4 +364,15 @@
         WHERE id = #{id}
     </update>
 
+    <!-- 原子停止任务：清空 executor 使旧执行线程的终态 CAS 失效，避免覆盖 STOP 后的 FAIL 终态。 -->
+    <update id="stopTask">
+        UPDATE retry_task
+        SET status = 3,
+            retry_num = 0,
+            executor = NULL,
+            gmt_modified = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND status IN (0, 1, 3)
+    </update>
+
 </mapper>

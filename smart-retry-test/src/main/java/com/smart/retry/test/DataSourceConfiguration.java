@@ -1,9 +1,9 @@
 package com.smart.retry.test;
 
 import com.alibaba.druid.pool.DruidDataSource;
-import com.alibaba.druid.pool.DruidPooledConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
@@ -16,15 +16,23 @@ import java.sql.SQLException;
 @Configuration
 public class DataSourceConfiguration {
 
+    @Value("${spring.datasource.url}")
+    private String url;
+
+    @Value("${spring.datasource.username}")
+    private String username;
+
+    @Value("${spring.datasource.password}")
+    private String password;
+
     @Bean
     public DataSource dataSource() throws SQLException {
         DruidDataSource dataSource = new DruidDataSource();
         // mysql-connector-java 8.x 驱动类
         dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        dataSource.setUsername("root");
-        dataSource.setPassword("root");
-        dataSource.setUrl("jdbc:mysql://127.0.0.1:3306/charging?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false");
-        DruidPooledConnection connection = dataSource.getConnection();
+        dataSource.setUrl(url);
+        dataSource.setUsername(username);
+        dataSource.setPassword(password);
         return dataSource;
     }
 

@@ -1,7 +1,5 @@
 package com.smart.retry.mybatis.entity.query;
 
-import com.alibaba.fastjson.annotation.JSONField;
-
 import java.util.Date;
 import java.util.List;
 

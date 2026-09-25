@@ -48,7 +48,7 @@ public class RemoteRetryer implements IRetryer {
     //借助guava的开源组件进行重试
     @Override
     public Object retry() throws Throwable{
-        registerRemoteRetyTask();
+        registerRemoteRetryTask();
         if (retryAttemptContext.getThrowable() != null) {
             throw retryAttemptContext.getThrowable();
         }
@@ -61,7 +61,7 @@ public class RemoteRetryer implements IRetryer {
      *
      * @return
      */
-    private void registerRemoteRetyTask() {
+    private void registerRemoteRetryTask() {
 
 
 
@@ -93,13 +93,13 @@ public class RemoteRetryer implements IRetryer {
         long taskId = retryConfiguration.getRetryTaskAcess().saveRetryTask(retryTask);
         retryTask.setId(taskId);
         if (taskId <= 0) {
-            log.warn("[RemoteRetryer#registerRemoteRetyTask] retry task save failed, skip enqueue, taskId:{}",
+            log.warn("[RemoteRetryer#registerRemoteRetryTask] retry task save failed, skip enqueue, taskId:{}",
                     taskId);
             return;
         }
 
         // 将任务加入 DelayQueue 精准调度（窗口内才入队）
-        SimpleContainer.enqueueIfInWindow(retryTask);
+        SimpleContainer.getContainer(retryConfiguration).enqueueIfInWindow(retryTask);
 
     }
 

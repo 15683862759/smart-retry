@@ -91,4 +91,12 @@ public interface RetryTaskDao {
     int restartRetryTask(@Param("id") Long id,
                          @Param("targetRetryNum") int targetRetryNum,
                          @Param("nextPlanTime") Date nextPlanTime);
+
+    /**
+     * 原子停止任务：仅 WAITING/RUNNING/FAIL 可停止，成功后清空执行租约并耗尽重试次数。
+     *
+     * @param id 任务 ID
+     * @return 受影响行数
+     */
+    int stopTask(@Param("id") Long id);
 }

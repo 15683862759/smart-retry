@@ -160,7 +160,7 @@ public class MybatisAccess implements RetryTaskAccess {
 
     @Override
     public void stopRetryTask(long taskId) {
-
+        retryTaskRepo.stopRetryTask(taskId);
     }
 
     @Override

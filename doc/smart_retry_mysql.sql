@@ -56,7 +56,7 @@ CREATE TABLE `retry_task` (
   KEY `idx_next_plan_time` (`next_plan_time`),
   KEY `idx_status_sharding_key_next_plan_time_retry_num` (`status`,sharding_key,`next_plan_time`,`retry_num`),
   KEY `idx_gmt_create_sharding_key` (`gmt_create`,`sharding_key`),
-  KEY `idx_unique_key` (`unique_key`)
+  UNIQUE KEY `uk_unique_key` (`unique_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='重试任务表';
 
 -- ============================================================
@@ -67,6 +67,6 @@ CREATE TABLE `retry_task` (
 -- 4. retry_task.idx_status_sharding_key_next_plan_time_retry_num:
 --    状态-分片键-下次执行时间-重试次数联合索引，用于任务分片查询
 -- 5. retry_task.idx_gmt_create_sharding_key: 创建时间-分片键索引，用于时间范围查询
--- 6. retry_task.idx_unique_key: 唯一标识索引，用于任务去重
+-- 6. retry_task.uk_unique_key: 唯一标识唯一索引，用于数据库层任务去重
 -- ============================================================
 -- 结束

@@ -149,7 +149,7 @@ public class RetryTaskService {
         
         // 只允许编辑 nextPlanTime, retryNum, param, status
         if (request.getNextPlanTime() != null) {
-            taskDO.setNextPlanTime(DateUtils.parseDate(request.getNextPlanTime(),"YYYY-MM-dd HH:mm:ss"));
+            taskDO.setNextPlanTime(DateUtils.parseDate(request.getNextPlanTime(),"yyyy-MM-dd HH:mm:ss"));
         }
         
         if (request.getRetryNum() != null) {

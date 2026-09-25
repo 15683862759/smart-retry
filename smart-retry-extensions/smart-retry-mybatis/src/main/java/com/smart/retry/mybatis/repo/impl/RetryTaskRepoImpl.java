@@ -11,6 +11,7 @@ import com.smart.retry.mybatis.entity.query.RetryTaskQuery;
 import com.smart.retry.mybatis.repo.RetryTaskRepo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.util.CollectionUtils;
 
 import java.util.Date;
@@ -57,7 +58,12 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
                     ? LogIdUtils.encode(lookup.getKey(), lookup.getValue())
                     : LogIdUtils.encode(null, LogIdUtils.getCurrentLogId()));
         }
-        retryTaskDao.insert(retryTask);
+        try {
+            retryTaskDao.insert(retryTask);
+        } catch (DuplicateKeyException e) {
+            logger.warn("[RetryTaskRepoImpl-saveRetryTask]uniqueKey:{} already exists, skip insert", uniqueKey);
+            return -1;
+        }
         return retryTask.getId();
     }
 
@@ -171,11 +177,15 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
 
     @Override
     public int deleteByGmtCreate(Date gmtCreate, int limitRows, int status) {
+        List<Long> shardingKeyList = ShardingContextHolder.shardingIndex();
+        if (CollectionUtils.isEmpty(shardingKeyList)) {
+            return 0;
+        }
         int deleteCount = 0;
         while (true) {
             int deleteRows = retryTaskDao.deleteByGmtCreate(gmtCreate,
                     limitRows,
-                    ShardingContextHolder.shardingIndex(),
+                    shardingKeyList,
                     status);
             deleteCount += deleteRows;
             if (deleteRows < limitRows) {
@@ -188,5 +198,10 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
     @Override
     public int restartRetryTask(long taskId, int targetRetryNum, Date nextPlanTime) {
         return retryTaskDao.restartRetryTask(taskId, targetRetryNum, nextPlanTime);
+    }
+
+    @Override
+    public int stopRetryTask(long taskId) {
+        return retryTaskDao.stopTask(taskId);
     }
 }

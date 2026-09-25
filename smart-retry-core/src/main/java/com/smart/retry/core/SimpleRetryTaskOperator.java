@@ -74,7 +74,7 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
         // 关键：内存入队延迟到事务提交后（enqueueAfterCommit）。
         // 若在事务内直接入队，调用方事务回滚时会产生幽灵任务与脏去重 key，
         // 且 RetryTaskCache 预标记的 key 无事务回调释放，会拦截后续同 uniqueKey 的入队。
-        SimpleContainer.enqueueAfterCommit(retryTask);
+        SimpleContainer.getContainer(retryConfiguration).enqueueAfterCommit(retryTask);
 
         return taskId;
     }
@@ -84,7 +84,7 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
         warnIfInTransaction("invokeTaskOnceSync");
         RetryTask retryTask = getTriggerableTask(taskId);
         if (retryTask == null) return null;
-        return SimpleContainer.invokeTaskOnceSync(retryTask, retryConfiguration);
+        return SimpleContainer.getContainer(retryConfiguration).invokeTaskOnceSync(retryTask, retryConfiguration);
     }
 
     @Override
@@ -92,7 +92,7 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
         warnIfInTransaction("invokeTaskAsync");
         RetryTask retryTask = getTriggerableTask(taskId);
         if (retryTask == null) return;
-        SimpleContainer.invokeTaskAsync(retryTask, retryConfiguration, smartExecutorConfigure);
+        SimpleContainer.getContainer(retryConfiguration).invokeTaskAsync(retryTask, retryConfiguration);
     }
 
     /**
