@@ -239,12 +239,30 @@ CREATE TABLE `retry_task` (
   `origin_retry_num` int DEFAULT NULL COMMENT '存放任务原始的次数',
   `current_log_id` varchar(128) DEFAULT NULL COMMENT '当前运行日志 ID（兼容 "key::value" 编码落库，重试时按 key 精准回填 MDC）',
   `unique_key` varchar(64) DEFAULT NULL COMMENT '唯一标识',
+  `active_flag` tinyint(1) DEFAULT NULL COMMENT '活跃去重标记：活跃任务为1，终态或次数耗尽任务为NULL，由触发器维护',
   `next_plan_time_strategy` int DEFAULT NULL,
   KEY `idx_next_plan_time` (`next_plan_time`),
   KEY `idx_status_sharding_key_next_plan_time_retry_num` (`status`,sharding_key,`next_plan_time`,`retry_num`),
   KEY `idx_gmt_create_sharding_key` (`gmt_create`,`sharding_key`),
-  UNIQUE KEY `uk_unique_key` (`unique_key`)
+  UNIQUE KEY `uk_unique_key` (`unique_key`, `active_flag`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='重试任务表';
+
+-- 仅对活跃任务去重；终态历史因 active_flag 为 NULL 可重复保留。
+CREATE TRIGGER `trg_retry_task_active_flag_insert`
+BEFORE INSERT ON `retry_task`
+FOR EACH ROW
+SET NEW.active_flag = CASE
+    WHEN NEW.status IN (0, 1, 3) AND NEW.retry_num >= 1 THEN 1
+    ELSE NULL
+END;
+
+CREATE TRIGGER `trg_retry_task_active_flag_update`
+BEFORE UPDATE ON `retry_task`
+FOR EACH ROW
+SET NEW.active_flag = CASE
+    WHEN NEW.status IN (0, 1, 3) AND NEW.retry_num >= 1 THEN 1
+    ELSE NULL
+END;
 
 ```
 

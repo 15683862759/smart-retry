@@ -125,6 +125,26 @@ public class RetryDefectRegressionTest extends AbstractTest {
     }
 
     @Test
+    public void testTerminalTaskDoesNotBlockNewTaskWithSameUniqueKey() {
+        String uniqueKey = "terminal-recreate-" + System.nanoTime();
+
+        long firstTaskId = saveTask(uniqueKey);
+        Assert.assertTrue("首次创建任务必须成功", firstTaskId > 0);
+
+        jdbcTemplate.update(
+                "UPDATE retry_task SET status = ?, retry_num = 0 WHERE id = ?",
+                RetryTaskStatus.SUCCESS.getCode(), firstTaskId);
+
+        long secondTaskId = saveTask(uniqueKey);
+        Assert.assertTrue("任务终态后，相同业务参数应允许重新创建任务", secondTaskId > 0);
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM retry_task WHERE unique_key = ?",
+                Integer.class, uniqueKey);
+        Assert.assertEquals("应允许保留终态历史并新增一条活跃任务", Integer.valueOf(2), count);
+    }
+
+    @Test
     public void testStopRetryTaskMakesTaskUnschedulable() throws Exception {
         TestParam param = new TestParam("stop-" + System.nanoTime());
         RetryTaskBuilder<TestParam> builder = RetryTaskBuilder.<TestParam>of()

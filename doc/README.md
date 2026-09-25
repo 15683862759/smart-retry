@@ -48,13 +48,19 @@
 | origin_retry_num | INT/NUMBER(10)/INTEGER | 否 | 存放任务原始的次数 |
 | current_log_id | BIGINT/NUMBER(20) | 否 | 当前运行日志id |
 | unique_key | VARCHAR(64) | 否 | 唯一标识 |
+| active_flag | TINYINT/SMALLINT/NUMBER(1) | 否 | 活跃去重标记：活跃任务为1，终态或次数耗尽任务为NULL，由触发器维护 |
 | next_plan_time_strategy | INT/NUMBER(10)/INTEGER | 否 | 下次计划时间策略（对应 NextPlanTimeStrategyEnum 枚举） |
 
 **索引**：
 - `idx_next_plan_time` - 下次执行时间索引
 - `idx_status_sharding_key_next_plan_time_retry_num` - 状态-分片键-下次执行时间-重试次数联合索引
 - `idx_gmt_create_sharding_key` - 创建时间-分片键索引
-- `uk_unique_key` - 唯一标识唯一索引
+- `uk_unique_key` - 唯一标识+活跃标记唯一索引，仅对活跃任务去重，终态历史可重复保留
+
+**升级脚本**：
+- `upgrade/mysql_1.0.2_active_unique_key.sql`
+- `upgrade/postgresql_1.0.2_active_unique_key.sql`
+- `upgrade/oracle_1.0.2_active_unique_key.sql`
 
 ## 使用指南
 

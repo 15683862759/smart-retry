@@ -68,6 +68,7 @@ CREATE TABLE retry_task (
     origin_retry_num INTEGER,
     current_log_id VARCHAR(128),
     unique_key VARCHAR(64),
+    active_flag SMALLINT,
     next_plan_time_strategy INTEGER
 );
 
@@ -94,14 +95,32 @@ COMMENT ON COLUMN retry_task.executor IS '执行者';
 COMMENT ON COLUMN retry_task.origin_retry_num IS '存放任务原始的次数';
 COMMENT ON COLUMN retry_task.current_log_id IS '当前运行日志 ID（兼容 "key::value" 编码落库，重试时按 key 精准回填 MDC）';
 COMMENT ON COLUMN retry_task.unique_key IS '唯一标识';
+COMMENT ON COLUMN retry_task.active_flag IS '活跃去重标记：活跃任务为1，终态或次数耗尽任务为NULL，由触发器维护';
 COMMENT ON COLUMN retry_task.next_plan_time_strategy IS '下次计划时间策略（对应 NextPlanTimeStrategyEnum 枚举）';
 
--- 4. 创建索引
+-- 4. 维护活跃去重标记
+-- 终态或重试次数耗尽后 active_flag 置 NULL；唯一索引中的 NULL 不参与唯一性判断，因此允许保留多条历史。
+CREATE OR REPLACE FUNCTION set_retry_task_active_flag() RETURNS trigger AS $$
+BEGIN
+    NEW.active_flag := CASE
+        WHEN NEW.status IN (0, 1, 3) AND NEW.retry_num >= 1 THEN 1
+        ELSE NULL
+    END;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_retry_task_active_flag ON retry_task;
+CREATE TRIGGER trg_retry_task_active_flag
+BEFORE INSERT OR UPDATE ON retry_task
+FOR EACH ROW EXECUTE PROCEDURE set_retry_task_active_flag();
+
+-- 5. 创建索引
 CREATE INDEX idx_next_plan_time ON retry_task (next_plan_time);
 CREATE INDEX idx_status_sharding_key_next_plan_time_retry_num
     ON retry_task (status,sharding_key, next_plan_time, retry_num);
 CREATE INDEX IF NOT EXISTS idx_retry_task_gmt_create_sharding_key ON retry_task(gmt_create, sharding_key);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_unique_key ON retry_task(unique_key);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_unique_key ON retry_task(unique_key, active_flag);
 
 -- ============================================================
 -- 索引说明：
@@ -111,7 +130,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_unique_key ON retry_task(unique_key);
 -- 4. retry_task.idx_status_sharding_key_next_plan_time_retry_num:
 --    状态-分片键-下次执行时间-重试次数联合索引，用于任务分片查询
 -- 5. idx_retry_task_gmt_create_sharding_key: 创建时间-分片键索引，用于时间范围查询
--- 6. uk_unique_key: 唯一标识唯一索引，用于数据库层任务去重
+-- 6. uk_unique_key: 唯一标识+活跃标记唯一索引，仅对活跃任务去重，
+--    终态历史因 active_flag 为 NULL 可重复保留
 -- 注意：PostgreSQL 支持 CREATE INDEX IF NOT EXISTS 语法，避免重复创建
 -- ============================================================
 -- 结束

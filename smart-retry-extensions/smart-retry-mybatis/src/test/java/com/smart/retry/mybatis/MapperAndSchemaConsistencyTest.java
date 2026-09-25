@@ -34,20 +34,41 @@ public class MapperAndSchemaConsistencyTest {
 
     @Test
     public void testUniqueKeyIndexesAreUniqueInEverySchema() throws IOException {
+        String mysql = read("../../doc/smart_retry_mysql.sql");
         String postgres = read("../../doc/smart_retry_pg.sql");
         String oracle = read("../../doc/smart_retry_oracle.sql");
 
+        Pattern mysqlUniqueIndex = Pattern.compile(
+                "UNIQUE\\s+KEY\\s+`uk_unique_key`\\s*\\(`unique_key`,\\s*`active_flag`\\)",
+                Pattern.CASE_INSENSITIVE);
         Pattern postgresUniqueIndex = Pattern.compile(
-                "CREATE\\s+UNIQUE\\s+INDEX\\s+IF\\s+NOT\\s+EXISTS\\s+uk_unique_key\\s+ON\\s+retry_task\\s*\\(unique_key\\)",
+                "CREATE\\s+UNIQUE\\s+INDEX\\s+IF\\s+NOT\\s+EXISTS\\s+uk_unique_key\\s+ON\\s+retry_task\\s*\\(unique_key,\\s*active_flag\\)",
                 Pattern.CASE_INSENSITIVE);
         Pattern oracleUniqueIndex = Pattern.compile(
-                "CREATE\\s+UNIQUE\\s+INDEX\\s+uk_unique_key\\s+ON\\s+retry_task\\s*\\(unique_key\\)",
+                "CREATE\\s+UNIQUE\\s+INDEX\\s+uk_unique_key\\s+ON\\s+retry_task\\s*\\(unique_key,\\s*active_flag\\)",
                 Pattern.CASE_INSENSITIVE);
 
+        Assert.assertTrue("MySQL unique_key should only deduplicate active tasks",
+                mysqlUniqueIndex.matcher(mysql).find());
         Assert.assertTrue("PostgreSQL unique_key should use a unique index",
                 postgresUniqueIndex.matcher(postgres).find());
         Assert.assertTrue("Oracle unique_key should use a unique index",
                 oracleUniqueIndex.matcher(oracle).find());
+    }
+
+    @Test
+    public void testActiveFlagIsMaintainedByTriggerInEverySchema() throws IOException {
+        String mysql = read("../../doc/smart_retry_mysql.sql");
+        String postgres = read("../../doc/smart_retry_pg.sql");
+        String oracle = read("../../doc/smart_retry_oracle.sql");
+
+        Assert.assertTrue("MySQL should maintain active_flag on insert and update",
+                mysql.contains("trg_retry_task_active_flag_insert")
+                        && mysql.contains("trg_retry_task_active_flag_update"));
+        Assert.assertTrue("PostgreSQL should maintain active_flag on insert and update",
+                postgres.contains("BEFORE INSERT OR UPDATE ON retry_task"));
+        Assert.assertTrue("Oracle should maintain active_flag on insert and update",
+                oracle.contains("BEFORE INSERT OR UPDATE ON retry_task"));
     }
 
     private Set<String> statementIds(String dialect) throws Exception {
