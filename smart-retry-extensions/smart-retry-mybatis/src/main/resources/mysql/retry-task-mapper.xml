@@ -255,6 +255,9 @@
         set status = 3,
             retry_num = retry_num - 1,
             executor = #{executor,jdbcType=VARCHAR},
+            <if test="nextPlanTime != null">
+                next_plan_time = #{nextPlanTime,jdbcType=TIMESTAMP},
+            </if>
             <if test="attribute != null">
                 attribute = #{attribute,jdbcType=LONGVARCHAR},
             </if>

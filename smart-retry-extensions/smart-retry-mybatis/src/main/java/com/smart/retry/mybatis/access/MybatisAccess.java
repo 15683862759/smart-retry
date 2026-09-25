@@ -140,11 +140,18 @@ public class MybatisAccess implements RetryTaskAccess {
 
     @Override
     public int markNullTaskObjectFail(Long id, String executor, int retryNum, String attribute) {
+        return markNullTaskObjectFail(id, executor, retryNum, null, attribute);
+    }
+
+    @Override
+    public int markNullTaskObjectFail(Long id, String executor, int retryNum,
+                                      Date nextPlanTime, String attribute) {
         // 仅设置"未注册 taskCode"失败标记所需字段，委托 Repo 执行单条原子 UPDATE（乐观锁 CAS 守卫）
         RetryTaskDO retryTaskDO = new RetryTaskDO();
         retryTaskDO.setId(id);
         retryTaskDO.setExecutor(executor);
         retryTaskDO.setRetryNum(retryNum);
+        retryTaskDO.setNextPlanTime(nextPlanTime);
         retryTaskDO.setAttribute(attribute);
         return retryTaskRepo.markNullTaskObjectFail(retryTaskDO);
     }

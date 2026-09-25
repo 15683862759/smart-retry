@@ -182,7 +182,8 @@ public class DefaultInnovation implements SmartInnovation {
         // 条件化更新（乐观锁 CAS 守卫）：仅当任务仍为 WAITING/FAIL 且 retry_num 与内存一致
         // （扣减前值）时写 FAIL 并扣减一次，防止分片重叠窗口下覆盖他方已认领的 RUNNING 或已终态。
         int updated = retryConfiguration.getRetryTaskAcess()
-                .markNullTaskObjectFail(retryTask.getId(), leaseToken, before, "taskObject is null");
+                .markNullTaskObjectFail(retryTask.getId(), leaseToken, before,
+                        retryTask.getNextPlanTime(), "taskObject is null");
         if (updated != 1) {
             LOGGER.warn("[DefaultInnovation#processNullTaskObject] mark fail skipped, "
                     + "task may be claimed/revived, taskId:{}", retryTask.getId());

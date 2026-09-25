@@ -155,6 +155,36 @@ public class RetryDefectRegressionTest extends AbstractTest {
     }
 
     @Test
+    public void testUnknownTaskCodeFailureAdvancesNextPlanTime() {
+        String uniqueKey = "unknown-task-next-plan-" + System.nanoTime();
+        long beforeInvoke = System.currentTimeMillis();
+        jdbcTemplate.update(
+                "INSERT INTO retry_task(gmt_create, gmt_modified, sharding_key, task_code, status, " +
+                        "retry_num, origin_retry_num, next_plan_time, interval_second, " +
+                        "next_plan_time_strategy, unique_key) " +
+                        "VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, 0, 1, 1, " +
+                        "CURRENT_TIMESTAMP, 60, 1, ?)",
+                ShardingContextHolder.getRandomShardingIndex(),
+                "unknown-task-code-" + System.nanoTime(), uniqueKey);
+        Long taskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM retry_task WHERE unique_key = ?", Long.class, uniqueKey);
+        try {
+            retryTaskOperator.invokeTaskOnceSync(taskId);
+
+            RetryTask task = retryTaskAccess.getRetryTask(taskId);
+            Assert.assertNotNull(task);
+            Assert.assertEquals(RetryTaskStatus.FAIL.getCode(), task.getStatus());
+            Assert.assertEquals(Integer.valueOf(0), task.getRetryNum());
+            Assert.assertNotNull("未注册任务失败后必须推进下次执行时间",
+                    task.getNextPlanTime());
+            Assert.assertTrue("未注册任务应按固定间隔推迟下一次扫描",
+                    task.getNextPlanTime().getTime() >= beforeInvoke + 59_000L);
+        } finally {
+            jdbcTemplate.update("DELETE FROM retry_task WHERE unique_key = ?", uniqueKey);
+        }
+    }
+
+    @Test
     public void testCreateTaskRejectsMissingNextPlanTimeStrategyWithFriendlyError() {
         RetryTaskBuilder<TestParam> builder = RetryTaskBuilder.<TestParam>of()
                 .withTaskCode(TASK_CODE)

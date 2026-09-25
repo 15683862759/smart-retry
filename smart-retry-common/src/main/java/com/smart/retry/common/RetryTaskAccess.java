@@ -103,6 +103,24 @@ public interface RetryTaskAccess {
     int markNullTaskObjectFail(Long id, String executor, int retryNum, String attribute);
 
     /**
+     * 条件化标记"未注册 taskCode"任务为失败，并推进下次执行时间。
+     *
+     * <p>默认委托旧方法以保持自定义实现兼容；持久化实现应覆盖本方法，
+     * 将 {@code nextPlanTime} 原子写入任务表，避免未注册任务在每个扫描周期立即重试。
+     *
+     * @param id           任务 ID
+     * @param executor     本次失败处理生成的唯一租约标识
+     * @param retryNum     扣减前的剩余重试次数
+     * @param nextPlanTime 按策略计算出的下次执行时间
+     * @param attribute    失败原因
+     * @return 1=写入成功，0=任务已被认领/状态已变化
+     */
+    default int markNullTaskObjectFail(Long id, String executor, int retryNum,
+                                       Date nextPlanTime, String attribute) {
+        return markNullTaskObjectFail(id, executor, retryNum, attribute);
+    }
+
+    /**
      * 条件化复活死信任务（乐观锁 CAS 守卫）。
      *
      * <p>仅当任务仍为 RUNNING(1) 且 {@code gmt_modified < deadTaskTime}（确认超时）时，
