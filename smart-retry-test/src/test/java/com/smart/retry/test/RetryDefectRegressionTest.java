@@ -294,6 +294,36 @@ public class RetryDefectRegressionTest extends AbstractTest {
     }
 
     @Test
+    public void testWebCreatedTaskRejectsMissingSharding() {
+        Long missingShardingId = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(id), 0) + 1000000 FROM retry_sharding",
+                Long.class);
+        String param = "{\"value\":\"missing-sharding-" + System.nanoTime() + "\"}";
+
+        TaskCreateRequest request = new TaskCreateRequest();
+        request.setTaskCode(TASK_CODE);
+        request.setTaskDesc("Web创建任务分片校验测试");
+        request.setRetryNum(3);
+        request.setDelaySecond(1);
+        request.setIntervalSecond(2);
+        request.setParam(param);
+        request.setShardingKey(missingShardingId);
+        request.setNextPlanTimeStrategy(NextPlanTimeStrategyEnum.FIXED.getCode());
+
+        try {
+            retryTaskService.createTask(request);
+            Assert.fail("不存在的分片ID不应允许创建任务");
+        } catch (BusinessException expected) {
+            Assert.assertEquals(Integer.valueOf(400), expected.getCode());
+        }
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM retry_task WHERE parameters = ?",
+                Integer.class, param);
+        Assert.assertEquals("非法分片任务不应落库", Integer.valueOf(0), count);
+    }
+
+    @Test
     public void testDeleteShardingIsRejectedWhileActiveTaskExists() {
         String uniqueKey = "atomic-delete-" + System.nanoTime();
         Long shardingId = null;

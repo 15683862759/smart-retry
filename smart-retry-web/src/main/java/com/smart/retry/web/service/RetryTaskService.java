@@ -106,6 +106,11 @@ public class RetryTaskService {
     public Long createTask(TaskCreateRequest request) {
         // 校验JSON格式
         validateJson(request.getParam());
+
+        // 不存在的分片不会被调度器接管，必须阻止任务落库
+        if (webRetryShardingDao.selectById(request.getShardingKey()) == null) {
+            throw new BusinessException(400, "分片不存在");
+        }
         
         // 创建任务对象
         RetryTaskDO taskDO = new RetryTaskDO();
