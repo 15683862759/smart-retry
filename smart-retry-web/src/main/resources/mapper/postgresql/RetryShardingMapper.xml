@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smart.retry.web.dao.WebRetryShardingDao">
+
+    <resultMap id="RetryShardingMap" type="com.smart.retry.web.entity.RetryShardingDO">
+        <result column="id" property="id"/>
+        <result column="gmt_create" property="gmtCreate"/>
+        <result column="creator_id" property="creatorId"/>
+        <result column="instance_id" property="instanceId"/>
+        <result column="status" property="status"/>
+        <result column="last_heartbeat" property="lastHeartbeat"/>
+    </resultMap>
+
+    <sql id="all_column">
+        id, gmt_create, creator_id, instance_id, status, last_heartbeat
+    </sql>
+
+    <select id="selectAllWithPage" resultMap="RetryShardingMap">
+        SELECT <include refid="all_column"/>
+        FROM retry_sharding
+        <where>
+            <if test="creatorId != null and creatorId != ''">
+                AND creator_id LIKE ('%' || #{creatorId} || '%')
+            </if>
+            <if test="instanceId != null and instanceId != ''">
+                AND instance_id LIKE ('%' || #{instanceId} || '%')
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAll" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM retry_sharding
+        <where>
+            <if test="creatorId != null and creatorId != ''">
+                AND creator_id LIKE ('%' || #{creatorId} || '%')
+            </if>
+            <if test="instanceId != null and instanceId != ''">
+                AND instance_id LIKE ('%' || #{instanceId} || '%')
+            </if>
+        </where>
+    </select>
+
+    <update id="updateInstanceId">
+        UPDATE retry_sharding
+        SET instance_id = #{instanceId}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" parameterType="java.lang.Long" resultMap="RetryShardingMap">
+        SELECT <include refid="all_column"/>
+        FROM retry_sharding
+        WHERE id = #{id}
+    </select>
+
+    <select id="countActiveInstances" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT instance_id)
+        FROM retry_sharding
+        WHERE last_heartbeat > (CURRENT_TIMESTAMP - (#{timeoutSeconds} * INTERVAL '1 second'))
+          AND instance_id IS NOT NULL
+          AND instance_id != ''
+    </select>
+
+    <select id="getShardingDistribution" resultType="java.util.HashMap">
+        SELECT instance_id AS "instanceId", COUNT(*) AS "count"
+        FROM retry_sharding
+        WHERE instance_id IS NOT NULL AND instance_id != ''
+        GROUP BY instance_id
+    </select>
+
+    <select id="getInstanceHeartbeats" resultType="java.util.HashMap">
+        SELECT instance_id AS "instanceId",
+               last_heartbeat AS "lastHeartbeat",
+               EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat)) AS "heartbeatDelay"
+        FROM retry_sharding
+        WHERE instance_id IS NOT NULL AND instance_id != ''
+        ORDER BY last_heartbeat DESC
+    </select>
+
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM retry_sharding WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByIdWhenNoUndeletableTasks" parameterType="java.lang.Long">
+        DELETE FROM retry_sharding
+        WHERE id = #{id}
+          AND NOT EXISTS (
+              SELECT 1
+              FROM retry_task
+              WHERE retry_task.sharding_key = retry_sharding.id
+                AND (
+                    retry_task.status = 0
+                    OR retry_task.status = 1
+                    OR (retry_task.status = 3 AND retry_task.retry_num > 0)
+                )
+          )
+    </delete>
+
+</mapper>

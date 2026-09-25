@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smart.retry.web.dao.WebRetryTaskDao">
+
+    <resultMap id="BaseResultMap" type="com.smart.retry.web.entity.RetryTaskDO">
+        <id column="id" jdbcType="BIGINT" property="id"/>
+        <result column="gmt_create" jdbcType="TIMESTAMP" property="gmtCreate"/>
+        <result column="gmt_modified" jdbcType="TIMESTAMP" property="gmtModified"/>
+        <result column="sharding_key" jdbcType="BIGINT" property="shardingKey"/>
+        <result column="task_desc" jdbcType="VARCHAR" property="taskDesc"/>
+        <result column="task_code" jdbcType="VARCHAR" property="taskCode"/>
+        <result column="status" jdbcType="TINYINT" property="status"/>
+        <result column="interval_second" jdbcType="INTEGER" property="intervalSecond"/>
+        <result column="delay_second" jdbcType="INTEGER" property="delaySecond"/>
+        <result column="next_plan_time" jdbcType="TIMESTAMP" property="nextPlanTime"/>
+        <result column="retry_num" jdbcType="INTEGER" property="retryNum"/>
+        <result column="origin_retry_num" jdbcType="INTEGER" property="originRetryNum"/>
+        <result column="creator" jdbcType="VARCHAR" property="creator"/>
+        <result column="executor" jdbcType="VARCHAR" property="executor"/>
+        <result column="next_plan_time_strategy" javaType="INTEGER" property="nextPlanTimeStrategy"/>
+        <result column="attribute" jdbcType="LONGVARCHAR" property="attribute"/>
+        <result column="parameters" jdbcType="LONGVARCHAR" property="parameters"/>
+        <result column="current_log_id" jdbcType="VARCHAR" property="currentLogId"/>
+        <result column="unique_key" jdbcType="VARCHAR" property="uniqueKey"/>
+    </resultMap>
+
+    <sql id="base_columns">
+        id, gmt_create, gmt_modified, task_desc, task_code, attribute, parameters,
+        status, delay_second, interval_second, next_plan_time, origin_retry_num,
+        next_plan_time_strategy, retry_num, creator, executor,
+        current_log_id, unique_key, sharding_key
+    </sql>
+
+    <sql id="baseSelectSql">
+        <where>
+            <trim prefixOverrides="AND">
+                <if test="id != null">AND id = #{id}</if>
+                <if test="statusList != null and statusList.size > 0">
+                    AND status IN
+                    (<foreach collection="statusList" item="item" separator=",">#{item}</foreach>)
+                </if>
+                <if test="status != null">AND status = #{status}</if>
+                <if test="shardingKeyList != null and shardingKeyList.size > 0">
+                    AND sharding_key IN
+                    (<foreach collection="shardingKeyList" item="item" separator=",">#{item}</foreach>)
+                </if>
+                <if test="taskCode != null and taskCode != ''">AND task_code = #{taskCode}</if>
+                <if test="taskDesc != null and taskDesc != ''">
+                    AND task_desc LIKE ('%' || #{taskDesc} || '%')
+                </if>
+                <if test="nextPlanTime != null">AND next_plan_time = #{nextPlanTime}</if>
+                <if test="retryNum != null">AND retry_num = #{retryNum}</if>
+                <if test="minNextPlanTime != null">AND next_plan_time >= #{minNextPlanTime}</if>
+                <if test="maxNextPlanTime != null"><![CDATA[AND next_plan_time <= #{maxNextPlanTime}]]></if>
+                <if test="creator != null">AND creator = #{creator}</if>
+                <if test="uniqueKey != null">AND unique_key = #{uniqueKey}</if>
+                <if test="minGmtCreate != null">AND gmt_create >= #{minGmtCreate}</if>
+                <if test="maxGmtCreate != null"><![CDATA[AND gmt_create <= #{maxGmtCreate}]]></if>
+            </trim>
+        </where>
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO retry_task (gmt_create, gmt_modified, task_desc, sharding_key,
+                                task_code, status, interval_second, delay_second,
+                                next_plan_time, retry_num, attribute, parameters,
+                                origin_retry_num, current_log_id, creator, executor,
+                                next_plan_time_strategy, unique_key)
+        VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, #{taskDesc}, #{shardingKey},
+                #{taskCode}, #{status}, #{intervalSecond}, #{delaySecond},
+                #{nextPlanTime}, #{retryNum}, #{attribute}, #{parameters},
+                #{originRetryNum}, #{currentLogId,jdbcType=VARCHAR}, #{creator}, #{executor},
+                #{nextPlanTimeStrategy}, #{uniqueKey})
+    </insert>
+
+    <update id="update">
+        UPDATE retry_task
+        <set>
+            gmt_modified = CURRENT_TIMESTAMP,
+            <if test="nextPlanTime != null">next_plan_time = #{nextPlanTime},</if>
+            <if test="retryNum != null">retry_num = #{retryNum},</if>
+            <if test="originRetryNum != null">origin_retry_num = #{originRetryNum},</if>
+            <if test="parameters != null">parameters = #{parameters},</if>
+            <if test="uniqueKey != null">unique_key = #{uniqueKey},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE id = #{id}
+          AND status IN (0, 2, 3)
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="base_columns"/> FROM retry_task WHERE id = #{id}
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM retry_task
+        WHERE id = #{id}
+          AND status IN (0, 2, 3)
+    </delete>
+
+    <delete id="batchDeleteByIds">
+        DELETE FROM retry_task WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND status IN (0, 2, 3)
+    </delete>
+
+    <select id="selectByQuery" resultMap="BaseResultMap">
+        SELECT <include refid="base_columns"/> FROM retry_task
+        <include refid="baseSelectSql"/>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByQuery" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM retry_task
+        <include refid="baseSelectSql"/>
+    </select>
+
+    <select id="countTaskStatusDistribution" resultType="java.util.HashMap">
+        SELECT status, COUNT(*) AS "count"
+        FROM retry_task
+        GROUP BY status
+    </select>
+
+    <select id="countTaskBacklogByType" resultType="java.util.HashMap">
+        SELECT task_code AS "taskCode", COUNT(*) AS "count"
+        FROM retry_task
+        WHERE status = 0
+        GROUP BY task_code
+    </select>
+
+    <select id="getDeadLetterTrend" resultType="java.util.HashMap">
+        SELECT TO_CHAR(gmt_create, 'YYYY-MM-DD HH24:00:00') AS "timePoint",
+               COUNT(*) AS "count"
+        FROM retry_task
+        WHERE status = 3
+          AND gmt_create > (CURRENT_TIMESTAMP - (#{hours} * INTERVAL '1 hour'))
+        GROUP BY TO_CHAR(gmt_create, 'YYYY-MM-DD HH24:00:00')
+        ORDER BY "timePoint"
+    </select>
+
+    <select id="getTaskProcessRate" resultType="java.lang.Double">
+        SELECT COUNT(*)::double precision / #{minutes} AS rate
+        FROM retry_task
+        WHERE status IN (2, 3)
+          AND gmt_modified > (CURRENT_TIMESTAMP - (#{minutes} * INTERVAL '1 minute'))
+    </select>
+
+    <select id="countUndeletableTasksByShardingKey" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM retry_task
+        WHERE sharding_key = #{shardingKey}
+          AND (
+              status = 0
+              OR status = 1
+              OR (status = 3 AND retry_num > 0)
+          )
+    </select>
+
+    <delete id="deleteByShardingKey">
+        DELETE FROM retry_task WHERE sharding_key = #{shardingKey}
+    </delete>
+
+</mapper>
