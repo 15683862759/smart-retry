@@ -4,9 +4,16 @@ package com.smart.retry.common.utils;
  * @author gao.gwq
  * @version 1.0
  * @date 2022/5/6  19:21
- * @Description TODO
+ * @Description: 异常堆栈格式化工具。将 Throwable 转为完整或精简堆栈文本，
+ * 用于写入任务错误字段和日志，便于后续排查失败原因。
  */
 public class ExceptionUtils {
+    /**
+     * 将异常转换为完整堆栈文本。
+     *
+     * @param e 业务异常；null 返回空字符串
+     * @return 异常类型、消息和完整堆栈
+     */
     public static String createStackTrackMessage(Throwable e) {
         if (e == null) {
             return "";
@@ -83,7 +90,7 @@ public class ExceptionUtils {
     }
 
 
-    // --- 用于测试的示例 ---
+    // --- 本地演示入口，生产调用方无需依赖 ---
 
     public static void main(String[] args) {
         try {

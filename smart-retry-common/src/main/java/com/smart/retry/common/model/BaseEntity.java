@@ -5,7 +5,7 @@ import java.util.Date;
 /**
  * @Author xiaoqiang
  * @Version BaseEntity.java, v 0.1 2025年02月11日 17:22 xiaoqiang
- * @Description: TODO
+ * @Description: 持久化模型公共基类，统一任务、日志等表的主键与审计时间字段。
  */
 
 public class BaseEntity implements java.io.Serializable {

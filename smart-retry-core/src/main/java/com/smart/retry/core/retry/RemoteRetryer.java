@@ -22,7 +22,8 @@ import java.util.Date;
 /**
  * @Author xiaoqiang
  * @Version RemoteRetryer.java, v 0.1 2025年02月14日 19:24 xiaoqiang
- * @Description: TODO
+ * @Description: 方法级远程重试注册器。将首次失败的方法调用快照序列化落库，
+ * 并在事务提交后加入内存精准调度队列。
  */
 public class RemoteRetryer implements IRetryer {
     private static final Logger log = LoggerFactory.getLogger(RemoteRetryer.class);
@@ -36,6 +37,14 @@ public class RemoteRetryer implements IRetryer {
 
     private RetryConfiguration retryConfiguration;
 
+    /**
+     * 创建方法级任务注册器。
+     *
+     * @param retryConfiguration    框架配置门面
+     * @param methodInvocation      当前 AOP 调用现场
+     * @param retryable             方法重试注解配置
+     * @param retryAttemptContext   首次调用结果和异常上下文
+     */
     public RemoteRetryer(RetryConfiguration retryConfiguration,MethodInvocation methodInvocation,
                          RetryOnMethod retryable,
                          RetryAttemptContext retryAttemptContext) {
@@ -47,6 +56,12 @@ public class RemoteRetryer implements IRetryer {
 
     //借助guava的开源组件进行重试
     @Override
+    /**
+     * 注册异步重试任务，并按首次调用语义返回结果或抛出原异常。
+     *
+     * @return 原方法返回值
+     * @throws Throwable 首次调用抛出的业务异常
+     */
     public Object retry() throws Throwable{
         registerRemoteRetryTask();
         if (retryAttemptContext.getThrowable() != null) {
@@ -57,9 +72,8 @@ public class RemoteRetryer implements IRetryer {
 
 
     /**
-     * 远程重试，注册到服务中心
-     *
-     * @return
+     * 构建并保存方法级重试任务。
+     * 保存成功后等待事务提交再入队，避免回滚产生幽灵任务。
      */
     private void registerRemoteRetryTask() {
 

@@ -19,7 +19,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * @Author xiaoqiang
  * @Version MybatisAccess.java, v 0.1 2025年02月15日 22:13 xiaoqiang
- * @Description: TODO
+ * @Description: MyBatis 持久化访问适配器。将核心引擎使用的 RetryTask 领域模型
+ * 转换为 MyBatis DO，并封装任务保存、查询、原子状态迁移、死信复活和清理操作。
  */
 public class MybatisAccess implements RetryTaskAccess {
 
@@ -35,6 +36,12 @@ public class MybatisAccess implements RetryTaskAccess {
 
 
     @Override
+    /**
+     * 查询 RUNNING 状态且执行时间超过阈值的疑似死信任务。
+     *
+     * @param maxExecuteTime 最大执行时长秒数
+     * @return 疑似死信任务列表；查询失败时由调用方记录并等待下一轮扫描
+     */
     public List<RetryTask> listDeadTask(int maxExecuteTime) {
         long currentTime = System.currentTimeMillis();
 
@@ -54,6 +61,12 @@ public class MybatisAccess implements RetryTaskAccess {
     }
 
 
+    /**
+     * 按主键查询单个任务。
+     *
+     * @param taskId 任务 ID
+     * @return 任务领域对象；不存在时返回 null
+     */
     public RetryTask getRetryTask(long taskId) {
         RetryTaskDO retryTask = retryTaskRepo.getRetryTask(taskId);
         if (retryTask == null) {
@@ -64,6 +77,11 @@ public class MybatisAccess implements RetryTaskAccess {
         return retryTaskDo;
     }
     @Override
+    /**
+     * 查询当前实例分片中的全部可执行任务。
+     *
+     * @return 可执行任务领域对象列表
+     */
     public List<RetryTask> listRetryTask() {
         List<RetryTaskDO> retryTaskDOS = retryTaskRepo.listAllWaitingRetryTask();
         if (CollectionUtils.isEmpty(retryTaskDOS)) {
@@ -79,6 +97,13 @@ public class MybatisAccess implements RetryTaskAccess {
     }
 
     @Override
+    /**
+     * 查询预加载窗口内到期的可执行任务。
+     *
+     * @param maxNextPlanTime 执行时间上界
+     * @param limit           查询上限
+     * @return 可执行任务领域对象列表
+     */
     public List<RetryTask> listRetryTask(Date maxNextPlanTime, int limit) {
         List<RetryTaskDO> retryTaskDOS = retryTaskRepo.listAllWaitingRetryTask(maxNextPlanTime, limit);
         if (CollectionUtils.isEmpty(retryTaskDOS)) {
@@ -94,6 +119,13 @@ public class MybatisAccess implements RetryTaskAccess {
     }
 
     @Override
+    /**
+     * 保存重试任务。未显式设置下次执行时间时，按延迟秒数计算；
+     * 重复任务由仓库层返回 -1。
+     *
+     * @param retryTask 待保存任务
+     * @return 新任务 ID；重复任务返回 -1
+     */
     public long saveRetryTask(RetryTask retryTask) {
 
         if (retryTask.getNextPlanTime() == null) {
@@ -107,6 +139,11 @@ public class MybatisAccess implements RetryTaskAccess {
     }
 
     @Override
+    /**
+     * 管理端按主键更新任务。该方法不校验执行租约，不能替代 CAS 状态迁移。
+     *
+     * @param retryTask 待更新任务
+     */
     public void updateRetryTask(RetryTask retryTask) {
         RetryTaskDO retryTaskDO = new RetryTaskDO();
         BeanUtils.copyProperties(retryTask, retryTaskDO);
@@ -139,6 +176,15 @@ public class MybatisAccess implements RetryTaskAccess {
     }
 
     @Override
+    /**
+     * 条件化把未注册 taskCode 的任务标记为失败，保留原下次执行时间。
+     *
+     * @param id         任务 ID
+     * @param executor   本次执行租约
+     * @param retryNum   扣减前剩余重试次数
+     * @param attribute  失败原因
+     * @return 受影响行数：1=成功，0=状态已漂移或已被认领
+     */
     public int markNullTaskObjectFail(Long id, String executor, int retryNum, String attribute) {
         return markNullTaskObjectFail(id, executor, retryNum, null, attribute);
     }
@@ -163,16 +209,33 @@ public class MybatisAccess implements RetryTaskAccess {
     }
 
     @Override
+    /**
+     * 删除任务。
+     *
+     * @param taskId 任务 ID
+     */
     public void deleteRetryTask(long taskId) {
         retryTaskRepo.deleteRetryTask(taskId);
     }
 
     @Override
+    /**
+     * 停止任务。仅允许非终态任务被停止，成功后不再继续调度。
+     *
+     * @param taskId 任务 ID
+     */
     public void stopRetryTask(long taskId) {
         retryTaskRepo.stopRetryTask(taskId);
     }
 
     @Override
+    /**
+     * 分批删除指定天数前的成功任务。
+     *
+     * @param clearBeforeDays 保留天数
+     * @param limitRows       单批删除上限
+     * @return 实际删除总数
+     */
     public int deleteHistoryRetryTask(int clearBeforeDays, int limitRows) {
         Date clearBeforeDate = new Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(clearBeforeDays));
 
@@ -181,6 +244,14 @@ public class MybatisAccess implements RetryTaskAccess {
     }
 
     @Override
+    /**
+     * 重启失败任务，恢复剩余重试次数和下次执行时间。
+     *
+     * @param taskId         任务 ID
+     * @param targetRetryNum 重启后的剩余重试次数
+     * @param nextPlanTime   重启后的下次执行时间
+     * @return 受影响行数
+     */
     public int restartRetryTask(long taskId, int targetRetryNum, Date nextPlanTime) {
         return retryTaskRepo.restartRetryTask(taskId, targetRetryNum, nextPlanTime);
     }

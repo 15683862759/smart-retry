@@ -33,7 +33,8 @@ import java.util.concurrent.*;
 /**
  * @Author xiaoqiang
  * @Version SimpleContainer.java, v 0.1 2025年02月18日 00:24 xiaoqiang
- * @Description: TODO
+ * @Description: 重试调度容器。维护数据库兜底扫描、DelayQueue 精准调度、
+ * 线程池消费、死信检测和历史清理，是多实例并发下任务执行的核心引擎。
  */
 public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
@@ -83,6 +84,10 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
     }
 
 
+    /**
+     * JVM 退出钩子。强制中断调度相关线程并关闭线程池，尽量减少退出时的任务悬挂；
+     * 已写入数据库的任务仍会在实例恢复后由 Producer 兜底扫描。
+     */
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             for (SimpleContainer container : CONTAINERS.values()) {
@@ -105,6 +110,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         return container;
     }
 
+    /**
+     * 仅供 JVM 退出钩子使用的快速停机：中断常驻线程并请求线程池关闭，不等待任务完成。
+     */
     private void shutdownNow() {
         if (schedulerThread != null) {
             schedulerThread.interrupt();
@@ -125,6 +133,16 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
 
     @Override
+    /**
+     * 启动调度容器。
+     *
+     * <p>实现过程：
+     * 1. 标记全局运行状态，确保扫描器开始注册任务；
+     * 2. 初始化消费线程池和预加载窗口；
+     * 3. 启动 Producer 兜底扫描和 DelayQueue 调度线程；
+     * 4. 按配置启动死信检测与历史清理任务。
+     * 方法可重复调用，容器已运行时直接返回。
+     */
     public void start() {
         synchronized (this) {
             if (containerRunning) {
@@ -160,6 +178,12 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
     }
 
 
+    /**
+     * 初始化消费线程池。
+     *
+     * <p>队列容量在配置的 maxInMemory 基础上预留 100 个缓冲位；
+     * 队列满时使用 CallerRunsPolicy，让 Producer 线程执行被拒绝任务，从而天然降低扫描速度。
+     */
     private synchronized void initTaskExecutor(SmartExecutorConfigure smartConfigure) {
 
         if (consumerExecutor != null) {
@@ -187,6 +211,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                 new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
+    /**
+     * 初始化历史清理调度器。单线程即可满足清理任务低频执行的需求。
+     */
     private void initTaskScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(1);
@@ -197,6 +224,15 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
 
     @Override
+    /**
+     * 停止容器并释放调度资源。
+     *
+     * <p>实现过程：
+     * 1. 关闭运行标记并中断调度、兜底扫描、死信扫描线程；
+     * 2. 关闭消费线程池和清理调度器，清空内存队列；
+     * 3. 从容器注册表移除当前实例；
+     * 4. 若最后一个容器已销毁，则清空任务注册与内存去重缓存，并同步全局运行状态。
+     */
     public void destroy() {
         boolean wasRunning;
         synchronized (this) {
@@ -241,6 +277,11 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         }
     }
 
+    /**
+     * 检查是否仍有任意容器处于运行状态。
+     *
+     * @return true=至少一个容器在运行
+     */
     private static boolean hasRunningContainer() {
         for (SimpleContainer container : CONTAINERS.values()) {
             if (container.containerRunning) {
@@ -250,6 +291,12 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         return false;
     }
 
+    /**
+     * 生成内存去重键，组合 taskCode 与业务 uniqueKey。
+     *
+     * @param retryTask 重试任务
+     * @return 内存去重键
+     */
     static String getUniqueKey(RetryTask retryTask) {
         return retryTask.getTaskCode() + "-" + retryTask.getUniqueKey();
     }
@@ -266,11 +313,22 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             this.executeTimeMillis = task.getNextPlanTime().getTime();
         }
 
+        /**
+         * 获取被包装的重试任务。
+         *
+         * @return 重试任务领域对象
+         */
         RetryTask getTask() {
             return task;
         }
 
         @Override
+        /**
+         * 获取距离执行时间还剩多少时间。
+         *
+         * @param unit 时间单位
+         * @return 剩余时间；到期后返回 0
+         */
         public long getDelay(TimeUnit unit) {
             return unit.convert(
                     executeTimeMillis - System.currentTimeMillis(),
@@ -278,6 +336,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         }
 
         @Override
+        /**
+         * 按执行时间升序排序，保证 DelayQueue 先弹出最早到期的任务。
+         */
         public int compareTo(Delayed o) {
             return Long.compare(this.executeTimeMillis,
                     ((ScheduledTask) o).executeTimeMillis);
@@ -368,17 +429,16 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
     }
 
     /**
-     * 任务执行完毕后的回调。
-     * 注意：此时 DB 已更新 (status/retryNum/nextPlanTime)
+     * 单次执行结束后的内存状态处理。
      *
-     * <p>关键设计：不在方法开头移除 inMemoryTaskKeys，而是保留 key 作为"占位锁"，
-     * 阻止 Producer 在竞态窗口中重复加载同一任务。只有在确定不再重入队时才移除 key。
+     * <p>实现过程：
+     * 1. 任务成功或剩余重试次数耗尽时释放去重键；
+     * 2. taskCode 已卸载时释放去重键，交给 Producer 后续重新加载；
+     * 3. 下次执行时间超出预加载窗口、或容器已停止时释放去重键；
+     * 4. 仍需重试的任务保留去重键作为占位锁，并重新放入 DelayQueue。
      *
-     * <p>单次执行模型：失败且未到终态的任务放入 DelayQueue，
-     * 后续重试由 SchedulerThread/Producer 异步调度推进，不再同步循环。
-     *
-     * @param task 已执行完毕的任务
-     * @return true=已重新入队等待异步重试，false=已到达终态（unmark）
+     * @param task 已完成本次执行的任务
+     * @return true=任务已重新入队，false=任务到达终态或暂不需要内存调度
      */
     boolean afterExecute(RetryTask task) {
 
@@ -417,6 +477,12 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         return true;
     }
 
+    /**
+     * 判断下次执行时间是否落在当前预加载窗口内。
+     *
+     * @param nextPlanTime 下次执行时间
+     * @return true=可以进入 DelayQueue 精准调度
+     */
     private boolean isInWindow(Date nextPlanTime) {
         long effectiveWindowMs = preloadWindowMs;
         // 防御：容器未启动时 preloadWindowMs 为 0，回退到配置值计算
@@ -518,9 +584,15 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         return shardingIndexList.contains(task.getShardingKey());
     }
 
+    /**
+     * 历史清理任务。只删除配置保留期之前且已成功的任务，避免误删仍需重试的数据。
+     */
     class ClearTask implements Runnable {
 
         @Override
+        /**
+         * 执行一次历史清理。清理失败只记录日志，等待下一次 Cron 触发。
+         */
         public void run() {
             try {
                 int deleteCount = retryConfiguration.getRetryTaskAcess().deleteHistoryRetryTask(smartConfigure.getClearTask().getBeforeDays(), smartConfigure.getClearTask().getLimitRows());
@@ -606,6 +678,14 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             this.sleepBaseTimeMilliseconds = smartConfigure.getTaskFindInterval() * 1000L;
         }
 
+        /**
+         * 扫描疑似死信并逐个尝试原子复活。
+         * 同时周期扫描数据库中可执行任务，只负责把任务放入 DelayQueue，
+         * 不直接提交业务执行，保证所有任务经过统一的调度和校验链路。
+         *
+         * <p>复活失败通常表示原执行方刚写入终态或另一实例已接管；
+         * 该情况只记录日志，不能把任务强制改回可执行状态。
+         */
         @Override
         public void run() {
 
@@ -661,6 +741,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             }
         }
 
+        /**
+         * 休眠一个扫描周期。线程被中断时恢复中断标记，让外层循环退出。
+         */
         private void sleepOneInterval() {
             try {
                 TimeUnit.MILLISECONDS.sleep(sleepBaseTimeMilliseconds);
@@ -675,6 +758,12 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
     // ========== 原有方法 ==========
 
+    /**
+     * 提交一个任务到消费线程池。先在内存中标记执行权，避免同一任务被重复提交。
+     *
+     * @param retryTask          待执行任务
+     * @param retryConfiguration 重试配置
+     */
     private void doProduceTask(RetryTask retryTask, RetryConfiguration retryConfiguration) {
         //任务存在则不处理，避免重复处理
         if (checkTaskExists(retryTask)) {
@@ -687,6 +776,11 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         CompletableFuture<Void> future = CompletableFuture.runAsync(new ConsumerTask(retryTask, retryConfiguration), consumerExecutor);
     }
 
+    /**
+     * 懒加载消费线程池，供手动触发等非 start() 路径使用。
+     *
+     * @param smartConfigure 执行器配置
+     */
     private void initTaskConsumerExecutor(SmartExecutorConfigure smartConfigure) {
         if (consumerExecutor != null) {
             return;
@@ -694,6 +788,12 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         initTaskExecutor(smartConfigure);
     }
 
+    /**
+     * 异步手动触发一次任务。释放自动入队占位后，把任务提交到消费线程池。
+     *
+     * @param retryTask          待执行任务
+     * @param retryConfiguration 重试配置
+     */
     void invokeTaskAsync(RetryTask retryTask,
                         RetryConfiguration retryConfiguration) {
         initTaskConsumerExecutor(smartConfigure);
@@ -761,7 +861,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
      *
      * @Author xiaoqiang
      * @Version ConsumerTask.java, v 0.1 2025年08月27日 xiaoqiang
-     * @Description: TODO
+     * @Description: 单次任务消费者，负责数据库校验、反射执行、终态写入和后续调度衔接。
      */
     class ConsumerTask implements Runnable {
 
@@ -809,14 +909,22 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         }
 
         /**
-         * 获取本次执行结果。仅在 run() 执行完毕后有效；未执行时返回 null。
+         * 获取本次执行结果。
          *
-         * @return 本次执行结果（status + businessResult），未执行时为 null
+         * <p>必须在 run() 结束后调用；被校验或去重拒绝时返回 null。
+         *
+         * @return 执行结果
          */
         public TaskExecutionResult getResult() {
             return result;
         }
 
+        /**
+         * 将任务状态映射为对调用方暴露的执行结果。
+         *
+         * @param task 已执行任务
+         * @return SUCCESS=任务终态成功，否则 FAIL
+         */
         private ExecuteResultStatus resolveStatus(RetryTask task) {
             return RetryTaskStatus.SUCCESS.getCode().equals(task.getStatus())
                     ? ExecuteResultStatus.SUCCESS

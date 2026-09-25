@@ -7,7 +7,8 @@ import java.util.Date;
 /**
  * @Author xiaoqiang
  * @Version RetryTaskDO.java, v 0.1 2025年02月15日 21:19 xiaoqiang
- * @Description: TODO
+ * @Description: 重试任务数据库实体。对应 retry_task 表，承载任务定位、执行参数、
+ * 分片归属、执行状态、下次执行时间和唯一去重键。
  */
 public class RetryTaskDO extends BaseEntity {
 
@@ -28,8 +29,10 @@ public class RetryTaskDO extends BaseEntity {
     private String parameters;
 
 
+    /** 当前归属的分片 ID，多实例按该字段划分任务处理范围 */
     private long shardingKey;
 
+    /** 最近一次执行结果或异常摘要，用于页面展示和问题定位 */
     private String attribute;
 
     /**
@@ -38,20 +41,27 @@ public class RetryTaskDO extends BaseEntity {
      */
     private int status;
 
+    /** 每次重试的基础间隔秒数 */
     private int intervalSecond;
 
+    /** 首次执行前的延迟秒数 */
     private int delaySecond;
 
+    /** 下一次允许执行的时间 */
     private Date nextPlanTime;
 
+    /** 剩余可重试次数；认领成功后先扣减再执行 */
     private int retryNum;
 
 
 
+    /** 创建时配置的原始重试次数，用于管理端展示和重置 */
     private int originRetryNum;
 
+    /** 创建任务的实例 IP */
     private String creator;
 
+    /** 当前执行租约 token；终态写入时用于 CAS 校验 */
     private String executor;
 
     /**
@@ -59,8 +69,10 @@ public class RetryTaskDO extends BaseEntity {
      */
     private String currentLogId;
 
+    /** 业务幂等键，与 taskCode 组合用于任务去重 */
     private String uniqueKey;
 
+    /** 下次执行时间策略编码 @see com.smart.retry.common.constant.NextPlanTimeStrategyEnum */
     private int nextPlanTimeStrategy;
 
     public int getNextPlanTimeStrategy() {

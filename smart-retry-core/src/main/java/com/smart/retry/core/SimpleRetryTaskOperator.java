@@ -26,7 +26,8 @@ import static org.springframework.transaction.annotation.Propagation.REQUIRED;
 /**
  * @Author xiaoqiang
  * @Version SimpleRetryTaskCreator.java, v 0.1 2025年02月20日 17:43 xiaoqiang
- * @Description: TODO
+ * @Description: 重试任务操作默认实现。提供任务创建、同步单次触发和异步触发能力，
+ * 并保证创建任务与业务事务一致、内存入队在事务提交后执行。
  */
 public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
 
@@ -35,6 +36,12 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
     private RetryConfiguration retryConfiguration;
     private SmartExecutorConfigure  smartExecutorConfigure;
 
+    /**
+     * 注入重试运行配置和调度参数。
+     *
+     * @param retryConfiguration    持久化、序列化和唯一标识配置门面
+     * @param smartExecutorConfigure 线程池、扫描周期和队列容量配置
+     */
     public SimpleRetryTaskOperator(RetryConfiguration retryConfiguration, SmartExecutorConfigure smartExecutorConfigure) {
         this.retryConfiguration = retryConfiguration;
         this.smartExecutorConfigure = smartExecutorConfigure;
@@ -44,10 +51,12 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
     @Transactional(rollbackFor = Exception.class, propagation = REQUIRED)
     public long createTask(RetryTaskBuilder<T> retryTaskBuilder) {
 
+        // 1. 校验策略配置，避免落库后出现无法计算的 next_plan_time。
         if (retryTaskBuilder.getNextPlanTimeStrategy() == null) {
             throw new RetryException("next plan time strategy is null");
         }
 
+        // 2. 复制业务构建参数并补齐框架字段：状态、分片、创建者和执行参数。
         RetryTask retryTask = new RetryTask();
         BeanUtils.copyProperties(retryTaskBuilder, retryTask);
 
@@ -66,6 +75,7 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
         checkRetryCondition(retryTask);
         retryTask.setUniqueKey(retryConfiguration.getIdentifier().identify(retryTask.getTaskCode(), retryTask.getParameters()));
 
+        // 3. 落库并生成稳定 unique_key；saveRetryTask 内部负责唯一键竞争兜底。
         long taskId = retryConfiguration.getRetryTaskAcess().saveRetryTask(retryTask);
 
         retryTask.setId(taskId);
@@ -85,6 +95,7 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
 
     @Override
     public TaskExecutionResult invokeTaskOnceSync(long taskId) {
+        // 手动触发会更新任务状态，避免在外层事务内调用导致状态与业务事务绑定。
         warnIfInTransaction("invokeTaskOnceSync");
         RetryTask retryTask = getTriggerableTask(taskId);
         if (retryTask == null) return null;
@@ -93,6 +104,7 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
 
     @Override
     public void invokeTaskAsync(long taskId) {
+        // 只做状态校验，不开启新事务；最终认领和状态更新由 ConsumerTask 完成。
         warnIfInTransaction("invokeTaskAsync");
         RetryTask retryTask = getTriggerableTask(taskId);
         if (retryTask == null) return;
@@ -145,8 +157,13 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
         }
     }
 
+    /**
+     * 校验任务创建参数。
+     *
+     * @param task 待落库任务
+     * @throws RetryException taskCode、重试次数、延迟或间隔配置非法
+     */
     private void checkRetryCondition(RetryTask task) {
-        // TODO: 2025年02月20日 17:44 xiaoqiang 这里需要实现具体的重试条件判断
         if (StringUtils.isEmpty(task.getTaskCode())) {
             throw new RetryException("task code is empty");
         }

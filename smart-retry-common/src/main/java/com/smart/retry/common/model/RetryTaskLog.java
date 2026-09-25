@@ -5,7 +5,8 @@ import java.util.Date;
 /**
  * @Author xiaoqiang
  * @Version RetryTaskLog.java, v 0.1 2025年02月11日 19:57 xiaoqiang
- * @Description: TODO
+ * @Description: 重试任务执行日志模型，记录单次或整体执行的时间、
+ * 执行机器、状态和错误信息，用于排查调度与业务执行问题。
  */
 public class RetryTaskLog extends BaseEntity {
 

@@ -7,7 +7,8 @@ import java.lang.reflect.Method;
 /**
  * @Author xiaoqiang
  * @Version RetrySnapshot.java, v 0.1 2025年02月15日 16:32 xiaoqiang
- * @Description: TODO
+ * @Description: 重试调用链快照。通过 ThreadLocal 记录本次请求中嵌套的
+ * @RetryOnMethod 方法链，用于把异常收敛到最底层方法并避免重复注册任务。
  */
 public class RetrySnapshot {
 
@@ -15,6 +16,11 @@ public class RetrySnapshot {
 
 
 
+    /**
+     * 从当前线程调用链中移除指定方法节点。
+     *
+     * @param method 已完成拦截的方法；null 时直接清空整个调用链
+     */
     public static void removeInterceptorChain(Method method) {
 
         if (method == null) {
@@ -44,6 +50,12 @@ public class RetrySnapshot {
         matchedPre.setNext(null);
     }
 
+    /**
+     * 按方法对象查找当前线程中的调用链节点。
+     *
+     * @param method 目标方法
+     * @return 匹配节点；不存在时返回 null
+     */
     public static MethodChain getChainByMethod(Method method) {
         MethodChain methodChainModel = METHOD_CHAIN_THREAD_LOCAL.get();
         MethodChain matched = null;
@@ -56,6 +68,11 @@ public class RetrySnapshot {
         return matched;
     }
 
+    /**
+     * 把新拦截的方法追加到当前线程调用链。
+     *
+     * @param chainModel 新进入的重试方法节点
+     */
     public static synchronized void setInterceptorChain(MethodChain chainModel) {
 
         MethodChain methodChainModel = METHOD_CHAIN_THREAD_LOCAL.get();

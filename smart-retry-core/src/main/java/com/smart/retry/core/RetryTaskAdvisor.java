@@ -30,7 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * @Author xiaoqiang
  * @Version RetryTaskAdvisor.java, v 0.1 2025年02月14日 19:30 xiaoqiang
- * @Description: TODO
+ * @Description: 方法重试 AOP Advisor。根据 @RetryOnMethod 匹配类和方法，
+ * 并将调用委托给 RetryTaskInterceptor 完成原方法执行与任务注册。
  */
 public class RetryTaskAdvisor extends AbstractPointcutAdvisor implements IntroductionAdvisor, BeanFactoryAware, InitializingBean {
 
@@ -42,6 +43,11 @@ public class RetryTaskAdvisor extends AbstractPointcutAdvisor implements Introdu
 
     private BeanFactory beanFactory;
 
+    /**
+     * 创建方法重试 Advisor。
+     *
+     * @param retryConfiguration 框架运行配置，用于拦截器创建重试任务
+     */
     public RetryTaskAdvisor(RetryConfiguration retryConfiguration) {
         this.retryConfiguration = retryConfiguration;
     }
@@ -76,6 +82,9 @@ public class RetryTaskAdvisor extends AbstractPointcutAdvisor implements Introdu
     }
 
     @Override
+    /**
+     * 初始化匹配点和拦截器；必须等待 BeanFactory 注入完成后执行。
+     */
     public void afterPropertiesSet() {
 
         Set<Class<? extends Annotation>> retryableAnnotationTypes = new LinkedHashSet<Class<? extends Annotation>>(1);
@@ -87,11 +96,22 @@ public class RetryTaskAdvisor extends AbstractPointcutAdvisor implements Introdu
         }
     }
 
+    /**
+     * 创建方法拦截器，并把 BeanFactory 传递给需要感知容器的实现。
+     *
+     * @return AOP Advice
+     */
     protected Advice buildAdvice() {
         RetryTaskInterceptor interceptor = new RetryTaskInterceptor(retryConfiguration);
         return interceptor;
     }
 
+    /**
+     * 构建类或方法注解联合匹配点。
+     *
+     * @param retryAnnotationTypes 需要拦截的注解类型
+     * @return 组合后的 Pointcut
+     */
     protected Pointcut buildPointcut(Set<Class<? extends Annotation>> retryAnnotationTypes) {
         ComposablePointcut result = null;
         for (Class<? extends Annotation> retryAnnotationType : retryAnnotationTypes) {

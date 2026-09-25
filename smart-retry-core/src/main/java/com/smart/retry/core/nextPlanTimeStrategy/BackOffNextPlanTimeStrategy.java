@@ -13,11 +13,18 @@ import java.util.Date;
  *
  * @Author xiaoqiang
  * @Version BackOffNextPlanTimeStrategy.java, v 0.1 2025年09月19日 11:19 xiaoqiang
- * @Description: TODO
+ * @Description: 指数退避策略。按已执行次数计算 2 的幂次倍率，
+ * 并在倍率和时间相加前做饱和处理，避免大重试次数导致溢出。
  */
 class BackOffNextPlanTimeStrategy implements NextPlanTimeStrategy {
 
     @Override
+    /**
+     * 计算指数退避后的下次执行时间。
+     *
+     * @param retryTask 当前任务，需要包含原始次数、剩余次数、间隔和当前计划时间
+     * @return 下次执行时间；溢出时封顶为 Date 能表达的最大毫秒值
+     */
     public Date nextExecuteTime(RetryTask retryTask) {
         // 已重试次数（从1开始计算第几次重试）
         int attempt = retryTask.getOriginRetryNum() - retryTask.getRetryNum() + 1;

@@ -8,7 +8,8 @@ import java.util.List;
 /**
  * @Author xiaoqiang
  * @Version RetryTaskAcess.java, v 0.1 2025年02月12日 15:34 xiaoqiang
- * @Description: TODO
+ * @Description: 重试任务持久化 SPI。定义任务查询、保存、原子认领、
+ * 终态写入、死信复活和历史清理等数据库操作契约，是多实例并发安全的关键边界。
  */
 public interface RetryTaskAccess {
 

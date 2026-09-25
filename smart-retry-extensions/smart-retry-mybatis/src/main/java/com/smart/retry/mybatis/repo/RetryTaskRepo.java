@@ -9,14 +9,27 @@ import java.util.List;
 /**
  * @Author xiaoqiang
  * @Version RetryTaskRepo.java, v 0.1 2025年02月16日 21:03 xiaoqiang
- * @Description: TODO
+ * @Description: 重试任务仓库接口。隔离核心引擎与 MyBatis 实现，提供任务持久化、
+ * 原子认领、终态写入、死信复活、停止重启和分批清理能力。
  */
 public interface RetryTaskRepo {
 
+    /**
+     * 保存重试任务，并在活跃任务已经存在时跳过重复插入。
+     *
+     * @param retryTask 待保存任务
+     * @return 新任务 ID；重复任务返回 -1
+     */
     long saveRetryTask(RetryTaskDO retryTask);
 
 
 
+    /**
+     * 按主键更新任务。适合管理端修改；执行链路必须使用 CAS 方法。
+     *
+     * @param retryTask 待更新任务
+     * @return 受影响行数
+     */
     int updateRetryTask(RetryTaskDO retryTask);
 
     /**
@@ -64,15 +77,45 @@ public interface RetryTaskRepo {
      */
     int reviveDeadRetryTask(Long id, Date deadTaskTime);
 
+    /**
+     * 按主键查询任务。
+     *
+     * @param id 任务 ID
+     * @return 任务实体；不存在时返回 null
+     */
     RetryTaskDO getRetryTask(long id);
 
+    /**
+     * 查询当前实例分片中所有可执行任务。
+     *
+     * @return 可执行任务列表
+     */
     List<RetryTaskDO> listAllWaitingRetryTask();
 
+    /**
+     * 查询预加载窗口内到期的可执行任务。
+     *
+     * @param maxNextPlanTime 执行时间上界；为空时按当前时间处理
+     * @param limit           查询上限
+     * @return 可执行任务列表
+     */
     List<RetryTaskDO> listAllWaitingRetryTask(Date maxNextPlanTime, int limit);
 
+    /**
+     * 查询运行时间超过阈值且疑似死信的任务。
+     *
+     * @param deadTaskTime 死信判定时间点
+     * @return 疑似死信任务列表
+     */
     List<RetryTaskDO> listAllDeadTask(Date deadTaskTime);
 
 
+    /**
+     * 删除任务。
+     *
+     * @param taskId 任务 ID
+     * @return 受影响行数
+     */
     int deleteRetryTask(long taskId);
 
 
@@ -95,5 +138,13 @@ public interface RetryTaskRepo {
      */
     int stopRetryTask(long taskId);
 
+    /**
+     * 分批删除指定时间前、指定状态的历史任务，直到清空本轮可删数据。
+     *
+     * @param gmtCreate 创建时间上界
+     * @param limitRows 单批删除上限
+     * @param status    只允许清理的最终状态
+     * @return 实际删除总数
+     */
     int deleteByGmtCreate(Date gmtCreate, int limitRows, int status);
 }

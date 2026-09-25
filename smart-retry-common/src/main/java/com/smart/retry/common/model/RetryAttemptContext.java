@@ -9,7 +9,8 @@ import java.lang.reflect.Method;
 /**
  * @Author xiaoqiang
  * @Version RetryAttemptContext.java, v 0.1 2025年02月15日 16:02 xiaoqiang
- * @Description: TODO
+ * @Description: 方法重试判断上下文。包装目标方法、执行结果、异常和注解配置，
+ * 供 RetryCondition 实现判断本次调用是否需要注册异步重试任务。
  */
 public class RetryAttemptContext implements Serializable {
 
@@ -33,11 +34,20 @@ public class RetryAttemptContext implements Serializable {
     private RetryOnMethod retryable;
 
 
+    /**
+     * 触发重试的异常类型白名单；为空表示所有异常都可重试。
+     */
     private Class<? extends Throwable>[] includes;
 
+    /**
+     * 禁止重试的异常类型黑名单；命中黑名单时优先生效。
+     */
     private Class<? extends Throwable>[] excludes;
 
 
+    /**
+     * 重试触发方式：异常触发或返回值触发。
+     */
     private RetryOccurType retryOccurType;
 
 

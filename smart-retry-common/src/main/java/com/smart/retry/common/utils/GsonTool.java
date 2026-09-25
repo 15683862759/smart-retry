@@ -15,7 +15,8 @@ import java.util.Map;
  * @author gao.gwq
  * @version 1.0
  * @date 2022/4/18  13:52
- * @Description TODO
+ * @Description: Gson 工具类。提供忽略空值、保留空值、集合和泛型对象的
+ * 序列化/反序列化能力，统一日期格式和复杂 Map key 处理规则。
  */
 public class GsonTool {
     private static final Gson GSON;

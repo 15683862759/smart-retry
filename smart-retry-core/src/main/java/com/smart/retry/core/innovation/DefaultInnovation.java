@@ -34,7 +34,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * @Author xiaoqiang
  * @Version DefaultInnovation.java, v 0.1 2025年02月18日 13:41 xiaoqiang
- * @Description: TODO
+ * @Description: 默认任务执行器。先原子认领数据库任务，再根据任务类型调用监听器
+ * 或业务方法，最后条件化写入终态并触发通知，是并发安全和幂等执行的关键实现。
  */
 public class DefaultInnovation implements SmartInnovation {
 
@@ -85,6 +86,19 @@ public class DefaultInnovation implements SmartInnovation {
     }
 
     @Override
+    /**
+     * 执行一次重试任务。
+     *
+     * <p>实现过程：
+     * 1. 先按策略计算下次执行时间，供认领任务和失败后调度使用；
+     * 2. 查找 taskCode 对应对象，缺失时用 CAS 将任务标记为失败；
+     * 3. 通过数据库 CAS 认领任务，只有一个执行方能够成功；
+     * 4. 按 CLASS/METHOD 模式反序列化参数并调用业务代码；
+     * 5. 在 finally 中以执行租约为守卫写入终态，成功写入后触发通知。
+     *
+     * @return 业务方法或监听器的返回值
+     * @throws Throwable 业务异常或认领竞争异常
+     */
     public Object invoke() throws Throwable {
 
         processNextExecuteTime(retryTask);
@@ -169,6 +183,12 @@ public class DefaultInnovation implements SmartInnovation {
         }
     }
 
+    /**
+     * 处理 taskCode 未注册的任务。
+     *
+     * <p>不进入普通执行租约流程，而是以 WAITING/FAIL 状态和扣减前 retry_num
+     * 为 CAS 守卫，原子扣减一次并标记 FAIL，避免覆盖其他实例刚认领的 RUNNING。
+     */
     private void processNullTaskObject() {
         String leaseToken = UUID.randomUUID().toString();
         Integer retryNum = retryTask.getRetryNum();
@@ -191,6 +211,11 @@ public class DefaultInnovation implements SmartInnovation {
     }
 
 
+    /**
+     * 按配置策略计算下次执行时间并写回内存任务对象。
+     *
+     * @param retryTask 当前任务
+     */
     private void processNextExecuteTime(RetryTask retryTask) {
 
         Date nextPlanTime = NextPlanTimeStrategyManager.nextTime(retryTask);
@@ -198,6 +223,18 @@ public class DefaultInnovation implements SmartInnovation {
 
     }
 
+    /**
+     * 调用业务代码。
+     *
+     * <p>CLASS 模式反序列化监听器泛型参数并执行 before/consume/after 生命周期；
+     * METHOD 模式反序列化方法参数并调用真实目标对象，避免再次经过重试 AOP。
+     *
+     * @param taskObject 任务注册对象
+     * @param retryTask  当前任务
+     * @param method    目标方法
+     * @return 业务返回值
+     * @throws Throwable 反序列化或业务调用异常
+     */
     private Object doInvoke(RetryTaskObject taskObject, RetryTask retryTask, Method method) throws Throwable {
         RetryTaskTypeEnum retryTaskTypeEnum = taskObject.getRetryType();
 
@@ -225,6 +262,18 @@ public class DefaultInnovation implements SmartInnovation {
         throw new RetryException("retryTaskTypeEnum is not support");
     }
 
+    /**
+     * 执行监听器模式生命周期。
+     *
+     * <p>beforeConsume 的异常只记录日志，不阻断 consume；
+     * afterConsume 始终执行，且自身异常也不会覆盖 consume 的返回值或异常。
+     *
+     * @param retryTask 当前任务
+     * @param taskObject 任务注册对象
+     * @param args       反序列化后的监听器参数
+     * @return consume 的返回值
+     * @throws Throwable consume 抛出的业务异常
+     */
     private ExecuteResultStatus invokeRetryListener(RetryTask retryTask, RetryTaskObject taskObject, Object args) throws Throwable {
 
         RetryListener retryListener = (RetryListener) taskObject.getTargetObj();
@@ -294,6 +343,19 @@ public class DefaultInnovation implements SmartInnovation {
         return type;
     }*/
 
+    /**
+     * 执行任务通知。
+     *
+     * <p>每次执行结束都会调用 oneTimeNotify；当剩余重试次数为 0 时，
+     * 额外调用 allRetryTaskFinishNotify 表示整个重试链路结束。
+     * 通知实现实例按类型缓存，单个通知失败只记录日志，不影响其他通知。
+     *
+     * @param taskObject           任务注册对象
+     * @param taskCode             任务编码
+     * @param notifyContext        通知上下文
+     * @param executeResultStatus  本次执行结果
+     * @param throwable            本次执行异常，成功时为 null
+     */
     private void notify(RetryTaskObject taskObject, String taskCode, NotifyContext notifyContext, ExecuteResultStatus executeResultStatus, Throwable throwable) {
         if (taskObject == null) {
             return;
@@ -328,6 +390,13 @@ public class DefaultInnovation implements SmartInnovation {
         });
     }
 
+    /**
+     * 反射创建通知实例并按类型缓存。
+     *
+     * @param taskCode 任务编码，仅用于失败日志
+     * @param clazz    通知类型
+     * @return 通知实例；创建失败时返回 null
+     */
     private static RetryTaskNotify generateNotify(String taskCode, Class<? extends RetryTaskNotify> clazz) {
         RetryTaskNotify notify = null;
         try {

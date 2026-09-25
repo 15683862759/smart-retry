@@ -16,20 +16,30 @@ import java.util.regex.Pattern;
 /**
  * @Author xiaoqiang
  * @Version IpUtils.java, v 0.1 2025年02月12日 12:42 xiaoqiang
- * @Description: TODO
+ * @Description: 实例 IP 工具。负责选择可用网卡地址、生成实例注册地址，
+ * 并提供严格 IPv4:port 格式校验和解析能力。
  */
 public class IpUtils {
     private static final Logger logger = LoggerFactory.getLogger(IpUtils.class);
 
     private static final String ANYHOST_VALUE = "0.0.0.0";
     private static final String LOCALHOST_VALUE = "127.0.0.1";
+    /**
+     * IPv4 地址格式校验规则；排除 0.0.0.0 与回环地址。
+     */
     private static final Pattern IP_PATTERN = Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3,5}$");
 
+    /**
+     * 严格 IPv4:port 校验规则，端口范围 1-65535。
+     */
     private static final Pattern IP_PORT_PATTERN = Pattern.compile(
             "^((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}"
                     + "(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)"
                     + ":(6553[0-5]|655[0-2]\\d|65[0-4]\\d{2}|6[0-4]\\d{3}|[1-5]\\d{4}|[1-9]\\d{0,3})$");
 
+    /**
+     * 首次探测成功后缓存的本地地址，避免每次任务执行都遍历网卡。
+     */
     private static volatile InetAddress LOCAL_ADDRESS = null;
 
     // ---------------------- valid ----------------------
@@ -167,8 +177,10 @@ public class IpUtils {
 
     /**
      * 校验ip加端口是否正确
-     * @param ipStr
-     * @return
+     * 只接受 IPv4:port，不支持 scheme 和 IPv6。
+     *
+     * @param ipStr 待校验地址
+     * @return true 表示格式合法
      */
     public static boolean isIPLegal(String ipStr) {
         if (StringUtils.isEmpty(ipStr)) {
@@ -180,7 +192,7 @@ public class IpUtils {
     /**
      * get ip address
      *
-     * @return String
+     * @return 本机 IPv4 字符串；网卡不可用时可能返回回环地址
      */
     public static String getIp() {
         return getLocalAddress().getHostAddress();
@@ -189,8 +201,8 @@ public class IpUtils {
     /**
      * get ip:port
      *
-     * @param port
-     * @return String
+     * @param port 服务端口，建议 1-65535
+     * @return 本机实例地址
      */
     public static String getIpPort(int port) {
         String ip = getIp();
@@ -204,6 +216,13 @@ public class IpUtils {
         return ip.concat(":").concat(String.valueOf(port));
     }
 
+    /**
+     * 解析 IPv4:port 地址。
+     *
+     * @param address 严格 IPv4:port 格式地址
+     * @return 数组下标 0 为 host 字符串，下标 1 为 port 整数
+     * @throws IllegalArgumentException 地址为空或格式非法
+     */
     public static Object[] parseIpPort(String address) {
         if (!isIPLegal(address)) {
             throw new IllegalArgumentException("IP:端口格式非法，正确格式如 192.168.1.100:8080");

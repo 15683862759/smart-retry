@@ -21,7 +21,8 @@ import java.util.Map;
 /**
  * @Author xiaoqiang
  * @Version MethodScanner.java, v 0.1 2025年02月14日 09:49 xiaoqiang
- * @Description: TODO
+ * @Description: 方法级重试扫描器。启动时发现所有 @RetryOnMethod 方法，
+ * 校验异常配置并按“类名#方法名”注册到 RetryCache。
  */
 public class RetryMethodScanner implements RetryScanner {
 
@@ -31,6 +32,11 @@ public class RetryMethodScanner implements RetryScanner {
 
 
     @Override
+    /**
+     * 遍历 Spring 容器，扫描并注册所有 @RetryOnMethod 方法。
+     *
+     * @param applicationContext Spring 应用上下文
+     */
     public void scan(ApplicationContext applicationContext) {
         String[] allBeanNames = applicationContext.getBeanDefinitionNames();
         for (String beanName : allBeanNames) {
@@ -44,6 +50,12 @@ public class RetryMethodScanner implements RetryScanner {
 
 
 
+    /**
+     * 解析单个 Bean 的方法注解，生成方法级任务定义。
+     *
+     * @param bean              Spring Bean
+     * @param applicationContext Spring 上下文，用于事务代理目标对象解析
+     */
     private void resolveMethodAnnotation(Object bean,ApplicationContext applicationContext) {
         Map<Method, RetryOnMethod> methodTMap = MethodIntrospector.selectMethods(bean.getClass(),
                 new MethodIntrospector.MetadataLookup<RetryOnMethod>() {
@@ -82,6 +94,13 @@ public class RetryMethodScanner implements RetryScanner {
         });
     }
 
+    /**
+     * 校验 include 和 exclude 异常集合没有交集。
+     *
+     * @param taskCode      任务编码，用于错误定位
+     * @param retryOnMethod 方法重试配置
+     * @throws RetryException 异常集合存在父子类或相同类型重叠
+     */
     static void checkExceptionConfiguration(String taskCode, RetryOnMethod retryOnMethod) {
         for (Class<? extends Throwable> include : retryOnMethod.include()) {
             for (Class<? extends Throwable> exclude : retryOnMethod.exclude()) {

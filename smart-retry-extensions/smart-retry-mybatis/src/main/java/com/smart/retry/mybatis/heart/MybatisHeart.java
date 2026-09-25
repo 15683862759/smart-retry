@@ -19,7 +19,8 @@ import java.util.stream.Collectors;
 /**
  * @Author xiaoqiang
  * @Version MybatisHeart.java, v 0.1 2025年02月15日 22:19 xiaoqiang
- * @Description: TODO
+ * @Description: MyBatis 分片心跳管理器。负责当前实例分片初始化、持续心跳，
+ * 并周期性抢占心跳超时的死分片，实现多实例故障转移。
  */
 public class MybatisHeart implements RetryTaskHeart {
 
@@ -49,7 +50,12 @@ public class MybatisHeart implements RetryTaskHeart {
 
 
     /**
-     * 初始化心跳
+     * 初始化当前实例的分片归属。
+     *
+     * <p>实现过程：
+     * 1. 先刷新实例已有分片心跳，避免正常重启期间分片被误判为死分片；
+     * 2. 若实例没有分片记录，则注册新分片并回读数据库生成的主键；
+     * 3. 将实例名下所有分片 ID 写入 ShardingContextHolder，供任务扫描和执行校验使用。
      */
     @Override
     public void initHeart() {
@@ -74,6 +80,9 @@ public class MybatisHeart implements RetryTaskHeart {
     }
 
 
+    /**
+     * 心跳后台任务。按配置间隔刷新分片心跳；线程被中断时恢复中断标记并退出。
+     */
     class HeartbeatTask implements Runnable {
         @Override
         public void run() {
@@ -99,6 +108,9 @@ public class MybatisHeart implements RetryTaskHeart {
         }
     }
 
+    /**
+     * 死分片扫描任务。按扫描间隔抢占超时分片，并在归属变化后同步内存分片列表。
+     */
     class ScrambleDeadShardingTask implements Runnable {
         @Override
         public void run() {
@@ -135,12 +147,20 @@ public class MybatisHeart implements RetryTaskHeart {
         }
     }
 
+    /**
+     * 获取当前实例 ID。
+     *
+     * @return 初始化时绑定的实例 ID
+     */
     private String getInstanceId() {
         //String instanceId = IpUtils.getIp()+":"+port;
         return instanceId;
     }
 
     @Override
+    /**
+     * 启动心跳后台线程。重复调用时保留首个线程，避免产生多个心跳循环。
+     */
     public void heartBeat() {
         if (heartbeatThread != null) {
             return;
@@ -154,7 +174,7 @@ public class MybatisHeart implements RetryTaskHeart {
     }
 
     /**
-     *
+     * 启动死分片扫描后台线程。重复调用时保留首个线程，避免重复抢占。
      */
     @Override
     public void scrambleDeadSharding() {

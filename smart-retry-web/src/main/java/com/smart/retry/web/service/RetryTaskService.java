@@ -27,7 +27,11 @@ import java.lang.reflect.Method;
 import java.util.*;
 
 /**
- * 任务管理服务
+ * 任务管理服务。
+ *
+ * <p>负责任务查询、人工创建、更新、删除和分片选项查询。
+ * 写操作使用事务包裹，并与调度器通过 common 接口解耦，
+ * 确保 Web 模块不直接依赖 core 的具体实现。
  */
 @Service
 @RequiredArgsConstructor
@@ -42,7 +46,16 @@ public class RetryTaskService {
     private static final Gson GSON = new Gson();
     
     /**
-     * 分页查询任务列表
+     * 分页查询任务列表。
+     *
+     * <p>实现过程：
+     * 1. 将请求转换为 DAO 查询条件；
+     * 2. 先查询总数，总数为 0 时直接返回空页；
+     * 3. 查询任务列表并按分片 ID 去重查询分片信息，避免 N+1；
+     * 4. 将 DO 转为 VO 并补充实例与分片 ID 的展示文本。
+     *
+     * @param request 查询请求，包含分页和过滤条件
+     * @return 任务分页结果
      */
     public PageResult<TaskVO> queryTasks(TaskQueryRequest request) {
         // 构建查询条件
@@ -100,7 +113,16 @@ public class RetryTaskService {
     }
     
     /**
-     * 创建任务
+     * 人工创建重试任务。
+     *
+     * <p>实现过程：
+     * 1. 校验参数 JSON 格式和目标分片存在性；
+     * 2. 组装任务实体，生成 MD5 uniqueKey 和延迟后的首次执行时间；
+     * 3. 在当前事务中写入数据库；
+     * 4. 若调度器存在，通过 enqueueAfterCommit 在事务提交后再入内存队列。
+     *
+     * @param request 创建请求
+     * @return 新任务 ID
      */
     @Transactional(rollbackFor = Exception.class)
     public Long createTask(TaskCreateRequest request) {
@@ -149,7 +171,12 @@ public class RetryTaskService {
     }
     
     /**
-     * 更新任务
+     * 更新任务的可编辑字段。
+     *
+     * <p>仅允许更新下次执行时间、剩余次数、参数和状态；
+     * RUNNING 任务不可编辑，终态任务只有失败或成功可重置为待执行。
+     *
+     * @param request 更新请求
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateTask(TaskUpdateRequest request) {
@@ -213,7 +240,12 @@ public class RetryTaskService {
     }
     
     /**
-     * 删除任务
+     * 删除任务。
+     *
+     * <p>RUNNING 状态任务可能正在执行，禁止删除；
+     * 删除行数为 0 表示状态在读取后变化，事务回滚。
+     *
+     * @param id 任务 ID
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteTask(Long id) {
@@ -235,7 +267,12 @@ public class RetryTaskService {
     }
     
     /**
-     * 批量删除任务
+     * 批量删除任务。
+     *
+     * <p>先检查全部目标状态，再对 ID 去重后批量删除；
+     * 删除数量与请求不一致时抛出异常并回滚整批操作。
+     *
+     * @param ids 任务 ID 列表
      */
     @Transactional(rollbackFor = Exception.class)
     public void batchDeleteTasks(List<Long> ids) {
@@ -260,7 +297,12 @@ public class RetryTaskService {
     }
     
     /**
-     * 获取分片选择列表
+     * 获取人工创建任务可选择的分片列表。
+     *
+     * <p>同一实例下只保留 ID 最小的分片作为默认选项，并按分片 ID 排序，
+     * 让选项顺序稳定。
+     *
+     * @return 实例与分片选项列表
      */
     public List<ShardingOptionVO> getShardingOptions() {
         // 查询所有分片
@@ -299,7 +341,9 @@ public class RetryTaskService {
     }
     
     /**
-     * 校验JSON格式
+     * 校验参数 JSON 格式。
+     *
+     * @param json 参数字符串
      */
     private void validateJson(String json) {
         try {

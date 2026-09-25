@@ -15,12 +15,18 @@ import java.lang.reflect.Method;
 /**
  * @Author xiaoqiang
  * @Version RetryClassScanner.java, v 0.1 2025年02月14日 17:23 xiaoqiang
- * @Description: TODO
+ * @Description: 类级重试扫描器。启动时发现 @RetryOnClass 的 RetryListener Bean，
+ * 提取 consume 方法并按 taskCode 注册到 RetryCache。
  */
 public class RetryClassScanner implements RetryScanner {
 
 
     @Override
+    /**
+     * 扫描所有 @RetryOnClass Bean 并注册类级消费者。
+     *
+     * @param applicationContext Spring 应用上下文
+     */
     public void scan(ApplicationContext applicationContext) {
         String[] beanNames = applicationContext.getBeanNamesForAnnotation(RetryOnClass.class);
         for (String beanName : beanNames) {
@@ -29,6 +35,12 @@ public class RetryClassScanner implements RetryScanner {
         }
     }
 
+    /**
+     * 解析单个类级注解，提取 consume 方法并注册到任务缓存。
+     *
+     * @param bean              Spring Bean
+     * @param applicationContext Spring 上下文，保留给代理场景扩展
+     */
     private void resolveClassAnnotation(Object bean, ApplicationContext applicationContext) {
         if (!(bean instanceof RetryListener)) {
             return;

@@ -3,7 +3,8 @@ package com.smart.retry.common;
 /**
  * @Author xiaoqiang
  * @Version RetryTaskHeart.java, v 0.1 2025年02月15日 22:16 xiaoqiang
- * @Description: TODO
+ * @Description: 分片心跳 SPI。负责实例心跳上报、死分片识别和故障转移，
+ * 保证多实例部署时任务分片能够被存活实例接管。
  */
 public interface RetryTaskHeart {
 

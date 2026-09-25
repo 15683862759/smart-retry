@@ -9,15 +9,28 @@ import com.smart.retry.common.model.RetryAttemptContext;
 /**
  * @Author xiaoqiang
  * @Version DefaultRetryCondition.java, v 0.1 2025年02月15日 17:15 xiaoqiang
- * @Description: TODO
+ * @Description: 默认重试条件实现。根据异常类型、返回状态和嵌套调用链
+ * 判断本次调用是否需要注册异步重试任务。
  */
 public class DefaultRetryCondition implements RetryCondition {
     private RetryAttemptContext retryAttemptContext;
+    /**
+     * 创建重试条件判断器。
+     *
+     * @param retryAttemptContext 本次调用结果和注解配置上下文
+     */
     public DefaultRetryCondition(RetryAttemptContext retryAttemptContext) {
         this.retryAttemptContext = retryAttemptContext;
     }
     @Override
 
+    /**
+     * 根据触发类型判断是否注册重试。
+     * 异常模式要求命中白名单且当前方法是调用链最底层；
+     * 结果模式要求业务返回 FAIL。
+     *
+     * @return true 表示需要创建异步重试任务
+     */
     public boolean needRetry() {
         RetryOccurType retryOccurType = retryAttemptContext.getRetryOccurType();
         //如果是基于异常的重试，判断条件

@@ -19,7 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 实例管理服务
+ * 实例管理服务。
+ *
+ * <p>负责分片实例的查询、实例地址修改和删除。
+ * 删除操作必须与活跃任务联动校验，避免删除分片后产生无人调度的悬挂任务。
  */
 @Service
 @RequiredArgsConstructor
@@ -31,7 +34,10 @@ public class RetryInstanceService {
     private final WebRetryShardingDao webRetryShardingDao;
     
     /**
-     * 分页查询实例列表
+     * 分页查询实例分片列表。
+     *
+     * @param request 查询请求，支持创建者和实例 ID 过滤
+     * @return 实例分页结果
      */
     public PageResult<InstanceVO> queryInstances(InstanceQueryRequest request) {
         // 查询总数
@@ -60,7 +66,11 @@ public class RetryInstanceService {
     }
     
     /**
-     * 更新实例信息
+     * 更新实例地址。
+     *
+     * <p>地址必须符合 ip:port 格式，防止管理端写入无法识别的实例标识。
+     *
+     * @param request 更新请求
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateInstance(InstanceUpdateRequest request) {
@@ -78,7 +88,12 @@ public class RetryInstanceService {
     }
     
     /**
-     * 删除实例
+     * 删除实例分片。
+     *
+     * <p>删除和任务校验由同一条 SQL 完成，避免两次数据库操作之间
+     * 新任务写入导致分片被删除后任务悬挂。
+     *
+     * @param id 分片 ID
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteInstance(Long id) {

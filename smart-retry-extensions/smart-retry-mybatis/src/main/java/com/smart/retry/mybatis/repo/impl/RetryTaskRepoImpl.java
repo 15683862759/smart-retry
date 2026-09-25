@@ -20,7 +20,8 @@ import java.util.List;
 /**
  * @Author xiaoqiang
  * @Version RetryTaskRepoImpl.java, v 0.1 2025年02月16日 21:09 xiaoqiang
- * @Description: TODO
+ * @Description: 重试任务仓库默认实现。实现任务保存去重、查询、分批删除，
+ * 并把带乐观锁守卫的原子更新直接透传给 MyBatis DAO。
  */
 public class RetryTaskRepoImpl implements RetryTaskRepo {
 
@@ -33,6 +34,13 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
     }
 
     @Override
+    /**
+     * 保存任务前先按 taskCode + uniqueKey 查询活跃任务，减少重复写入；
+     * 并依赖数据库唯一索引兜底处理并发插入竞态。
+     *
+     * @param retryTask 待保存任务
+     * @return 新任务 ID；已存在活跃任务时返回 -1
+     */
     public long saveRetryTask(RetryTaskDO retryTask) {
         String uniqueKey = retryTask.getUniqueKey();
         RetryTaskQuery retryTaskQuery = new RetryTaskQuery();
@@ -68,6 +76,13 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
     }
 
     @Override
+    /**
+     * 管理端按主键更新任务。先确认任务存在，便于返回清晰日志；
+     * 该方法不带执行租约守卫，不能用于执行链路状态迁移。
+     *
+     * @param retryTask 待更新任务
+     * @return 受影响行数；任务不存在时返回 0
+     */
     public int updateRetryTask(RetryTaskDO retryTask) {
 
         long taskId = retryTask.getId();
@@ -109,11 +124,22 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
     }
 
     @Override
+    /**
+     * 按主键查询任务。
+     *
+     * @param id 任务 ID
+     * @return 任务实体；不存在时返回 null
+     */
     public RetryTaskDO getRetryTask(long id) {
         return retryTaskDao.selectById(id);
     }
 
-    //获取所有执行中的任务，并且超过最大的执行时间
+    /**
+     * 查询当前实例分片中处于 RUNNING 且执行时间超过阈值的疑似死信任务。
+     *
+     * @param deadTaskTime 死信判定时间点
+     * @return 疑似死信任务列表；当前实例没有分片时返回空列表
+     */
     @Override
     public List<RetryTaskDO> listAllDeadTask(Date deadTaskTime) {
         RetryTaskQuery query = new RetryTaskQuery();
@@ -141,6 +167,11 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
     }
 
     @Override
+    /**
+     * 查询当前实例分片中可执行任务，默认最多 500 条。
+     *
+     * @return 可执行任务列表；当前实例没有分片时返回空列表
+     */
     public List<RetryTaskDO> listAllWaitingRetryTask() {
         RetryTaskQuery query = new RetryTaskQuery();
         //如果获取不到分区，则返回空列表，不执行任何重试任务
@@ -159,6 +190,13 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
     }
 
     @Override
+    /**
+     * 查询预加载窗口内到期的可执行任务。
+     *
+     * @param maxNextPlanTime 执行时间上界；为空时按当前时间处理
+     * @param limit           查询上限
+     * @return 可执行任务列表；当前实例没有分片时返回空列表
+     */
     public List<RetryTaskDO> listAllWaitingRetryTask(Date maxNextPlanTime, int limit) {
         RetryTaskQuery query = new RetryTaskQuery();
         //如果获取不到分区，则返回空列表，不执行任何重试任务
@@ -176,6 +214,14 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
     }
 
     @Override
+    /**
+     * 按批删除历史任务，直到某批删除数量小于批量上限，避免单条 SQL 锁过多数据。
+     *
+     * @param gmtCreate 创建时间上界
+     * @param limitRows 单批删除上限
+     * @param status    只允许清理的最终状态
+     * @return 实际删除总数
+     */
     public int deleteByGmtCreate(Date gmtCreate, int limitRows, int status) {
         List<Long> shardingKeyList = ShardingContextHolder.shardingIndex();
         if (CollectionUtils.isEmpty(shardingKeyList)) {

@@ -13,7 +13,9 @@ import java.lang.annotation.Target;
 /**
  * @Author xiaoqiang
  * @Version Retryable.java, v 0.1 2025年02月12日 11:11 xiaoqiang
- * @Description: TODO
+ * @Description: 方法级重试注解。标注在 Spring Bean 的 public 方法上，
+ * 首次同步执行抛出命中异常后，框架在当前事务内注册重试任务，
+ * 后续由调度器按配置策略异步重试。
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
@@ -46,6 +48,7 @@ public @interface RetryOnMethod {
 
     /**
      * 第一次延迟时间，如果小于0，会先
+     * 按任务创建时间立即调度；正常配置应大于等于 0。
      * @return
      */
     int firstDelaySecond() default 10;
@@ -75,8 +78,19 @@ public @interface RetryOnMethod {
     Class<? extends IRetryCallback>[] retryCallback() default {};
 
 
+    /**
+     * 首次调用的触发方式。EXCEPTION 表示命中异常时重试，
+     * RESULT 表示由调用方基于返回值或业务状态主动创建任务。
+     *
+     * @return 重试触发类型
+     */
     RetryOccurType occurType() default RetryOccurType.EXCEPTION;
 
+    /**
+     * 任务结束通知列表。每个通知独立执行，单个通知失败不影响任务状态。
+     *
+     * @return 通知类型数组
+     */
     Class<? extends RetryTaskNotify>[] retryTaskNotifies() default {};
 
 }

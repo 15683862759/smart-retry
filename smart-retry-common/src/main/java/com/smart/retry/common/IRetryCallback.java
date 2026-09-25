@@ -9,6 +9,7 @@ import com.smart.retry.common.constant.ExecuteResultStatus;
  * @Version IRetryCallback.java, v 0.1 2023年08月03日 23:31 gao.gwq
  * @Description:
  * 重试任务执行结束后回调方法,
+ * 回调与业务方法解耦，失败不会影响原任务的终态。
  */
 public interface IRetryCallback {
 
@@ -18,6 +19,7 @@ public interface IRetryCallback {
      * @param result 本次重试执行的结果，如果没有返回则是null
      * @param args 本次重试的入参
      * 回调方法是独立的事务
+     * 实现不应抛出阻断性异常，否则需要自行记录失败。
      */
     void executeCallback(ExecuteResultStatus resultStatus, Object result, Object args);
 }

@@ -15,7 +15,10 @@ import java.time.ZoneId;
 import java.util.*;
 
 /**
- * 仪表盘监控服务
+ * 仪表盘监控服务。
+ *
+ * <p>聚合实例心跳、分片分布、任务状态、任务积压、死信趋势和处理速率，
+ * 为管理后台提供一屏式运行状态视图。
  */
 @Slf4j
 @Service
@@ -26,7 +29,14 @@ public class RetryDashboardService {
     private final WebRetryTaskDao webRetryTaskDao;
     
     /**
-     * 获取仪表盘监控数据
+     * 获取仪表盘监控数据。
+     *
+     * <p>实现过程：
+     * 1. 查询活跃实例数量和分片分布；
+     * 2. 转换实例心跳，并兼容 LocalDateTime 与 Date 两种驱动返回类型；
+     * 3. 汇总任务状态、任务类型积压、死信趋势和处理速率。
+     *
+     * @return 仪表盘数据
      */
     public DashboardVO getDashboardData() {
         DashboardVO dashboard = new DashboardVO();

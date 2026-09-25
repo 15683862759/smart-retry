@@ -6,23 +6,31 @@ import java.util.List;
 /**
  * @Author xiaoqiang
  * @Version RetryTaskQuery.java, v 0.1 2025年02月15日 21:19 xiaoqiang
- * @Description: TODO
+ * @Description: 重试任务查询条件对象。供 MyBatis 动态 SQL 组合 ID、任务编码、状态、
+ * 分片、重试次数、执行时间和分页条件。
  */
 public class RetryTaskQuery {
 
 
+    /** 任务 ID 精确匹配 */
     private Long id;
 
+    /** 任务 ID 集合匹配 */
     private List<Long> idList;
+    /** 任务编码精确匹配 */
     private String taskCode;
 
+    /** 单个任务状态精确匹配 */
     private Integer status;
 
+    /** 多个任务状态匹配 */
     private List<Integer> statusList;
 
+    /** 分片 ID 集合匹配，用于限定实例处理范围 */
     private List<Long> shardingKeyList;
 
 
+    /** 创建实例精确匹配 */
     private String creator;
 
     private Integer intervalSecond;
@@ -45,27 +53,39 @@ public class RetryTaskQuery {
         this.delayTime = delayTime;
     }
 
+    /** 剩余重试次数精确匹配 */
     private Integer retryNum;
 
+    /** 下次执行时间下界 */
     private Date minNextPlanTime;
 
+    /** 下次执行时间上界 */
     private Date maxNextPlanTime;
 
+    /** 剩余重试次数下界 */
     private Integer minRetryNum;
 
+    /** 剩余重试次数上界 */
     private Integer maxRetryNum;
 
+    /** 原始重试次数精确匹配 */
     private Integer originRetryNum;
 
+    /** 原始重试次数下界 */
     private Integer minOriginRetryNum;
+    /** 原始重试次数上界 */
     private Integer maxOriginRetryNum;
 
+    /** 执行租约 token 精确匹配 */
     private String executor;
 
+    /** 业务幂等键精确匹配 */
     private String uniqueKey;
 
+    /** 下次执行时间精确匹配 */
     private Date nextPlanTime;
 
+    /** 死信判定时间点，通常用于 gmt_modified 小于该值 */
     private Date deadTaskTime;
 
     public Date getDeadTaskTime() {
@@ -84,7 +104,9 @@ public class RetryTaskQuery {
         this.nextPlanTime = nextPlanTime;
     }
 
+    /** 每页查询数量，默认 100 */
     private int limit = 100;
+    /** 查询偏移量，默认 0 */
     private int offset = 0;
 
     public Long getId() {
