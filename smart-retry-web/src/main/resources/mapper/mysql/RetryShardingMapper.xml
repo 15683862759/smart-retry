@@ -97,4 +97,20 @@
 		DELETE FROM retry_sharding WHERE id = #{id}
 	</delete>
 
+	<!-- 原子删除实例：存在待执行、执行中或可重试任务时拒绝删除，避免校验与删除之间产生竞态 -->
+	<delete id="deleteByIdWhenNoUndeletableTasks" parameterType="java.lang.Long">
+		DELETE FROM retry_sharding
+		WHERE id = #{id}
+		AND NOT EXISTS (
+		    SELECT 1
+		    FROM retry_task
+		    WHERE retry_task.sharding_key = retry_sharding.id
+		    AND (
+		        retry_task.status = 0
+		        OR retry_task.status = 1
+		        OR (retry_task.status = 3 AND retry_task.retry_num > 0)
+		    )
+		)
+	</delete>
+
 </mapper>

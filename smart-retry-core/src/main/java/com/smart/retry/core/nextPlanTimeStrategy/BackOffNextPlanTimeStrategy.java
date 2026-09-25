@@ -22,23 +22,20 @@ class BackOffNextPlanTimeStrategy implements NextPlanTimeStrategy {
         // 已重试次数（从1开始计算第几次重试）
         int attempt = retryTask.getOriginRetryNum() - retryTask.getRetryNum() + 1;
 
-        // 指数退避：间隔 = 基础间隔 * 2^(attempt - 1)，第一次重试就是 base * 1
-        long backoffIntervalMs = retryTask.getIntervalSecond() * 1000L * (1L << Math.max(0, attempt - 1));
+        // 指数退避：间隔 = 基础间隔 * 2^(attempt - 1)，第一次重试就是 base * 1。
+        // 大重试次数时饱和到 Long.MAX_VALUE，避免位移回绕或乘法溢出得到负间隔。
+        int shift = Math.max(0, attempt - 1);
+        long multiplier = 1L << Math.min(shift, 62);
+        long intervalMs = retryTask.getIntervalSecond() * 1000L;
+        long cappedIntervalMs = Math.min(intervalMs, Long.MAX_VALUE / multiplier);
+        long backoffIntervalMs = cappedIntervalMs * multiplier;
 
         // 下次执行时间 = 当前计划时间 + 计算出的退避间隔
-        long nextTime = retryTask.getNextPlanTime().getTime() + backoffIntervalMs;
+        long currentPlanTime = retryTask.getNextPlanTime().getTime();
+        long nextTime = currentPlanTime > Long.MAX_VALUE - backoffIntervalMs
+                ? Long.MAX_VALUE
+                : currentPlanTime + backoffIntervalMs;
 
         return new Date(nextTime);
     }
-
-    public static void main(String[] args) {
-        BackOffNextPlanTimeStrategy backOffNextPlanTimeStrategy = new BackOffNextPlanTimeStrategy();
-        RetryTask retryTask = new RetryTask();
-        retryTask.setIntervalSecond(300);
-        retryTask.setOriginRetryNum(5);
-        retryTask.setRetryNum(1);
-        retryTask.setNextPlanTime(new Date());
-        System.out.println(backOffNextPlanTimeStrategy.nextExecuteTime(retryTask));
-    }
-
 }

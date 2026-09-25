@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## 项目概述
 
@@ -22,7 +22,7 @@ mvn clean compile
 mvn test
 
 # 运行单个测试类
-mvn -pl smart-retry-test test -Dtest=ClassRetryFlowTest
+mvn -pl smart-retry-test test -Dtest=MybatisTest
 
 # 跳过测试打包
 mvn clean package -DskipTests
@@ -193,8 +193,8 @@ MyBatis 数据源配置前缀：`spring.smart-retry.mybatis`（`SmartConfigure`�
  * @param nodeCode    中心仓code 必填
  * @param solutionKey 解决方案 必填 (中心仓：centerwms-mmc-alibaba)
  * @param isTest      测试标 (预发：1, 正式：0)
- * @param pageSize    页大小 100 
- * @return 
+ * @param pageSize    页大小 100
+ * @return
  * @see xxxxx
  */
 ```

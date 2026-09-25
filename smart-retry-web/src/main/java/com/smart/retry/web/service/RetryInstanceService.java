@@ -1,7 +1,6 @@
 package com.smart.retry.web.service;
 
 import com.smart.retry.web.dao.WebRetryShardingDao;
-import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.entity.RetryShardingDO;
 import com.smart.retry.web.dto.PageResult;
 import com.smart.retry.web.dto.instance.InstanceQueryRequest;
@@ -29,7 +28,6 @@ public class RetryInstanceService {
     private static final Logger log = LoggerFactory.getLogger(RetryInstanceService.class);
     
     private final WebRetryShardingDao webRetryShardingDao;
-    private final WebRetryTaskDao webRetryTaskDao;
     
     /**
      * 分页查询实例列表
@@ -89,25 +87,10 @@ public class RetryInstanceService {
             throw new BusinessException("实例不存在");
         }
             
-        // 校验当前实例下是否存在不能删除的任务
-        // 包括：待执行(0)、执行中(1)、失败但重试次数大于0的任务
-        int undeletableCount = webRetryTaskDao.countUndeletableTasksByShardingKey(shardingDO.getId());
-        if (undeletableCount > 0) {
-            throw new BusinessException(
-                String.format("该实例下存在%d个待执行、执行中或可重试的任务，无法删除。请先处理相关任务。", undeletableCount)
-            );
-        }
-            
-        log.info("[InstanceService#deleteInstance]实例任务校验通过，id: {}, instanceId: {}", id, shardingDO.getInstanceId());
-            
-        // 删除该实例下的所有任务
-        //retryTaskDao.deleteByShardingKey(shardingDO.getId());
-        //log.info("[InstanceService#deleteInstance]删除实例下的所有任务成功，id: {}, instanceId: {}", id, shardingDO.getInstanceId());
-            
-        // 删除实例
-        int result = webRetryShardingDao.deleteById(id);
+        // 删除和活跃任务校验在同一条 SQL 中完成，避免校验与删除之间新任务写入造成悬挂数据。
+        int result = webRetryShardingDao.deleteByIdWhenNoUndeletableTasks(id);
         if (result == 0) {
-            throw new BusinessException("删除实例失败");
+            throw new BusinessException("该实例下存在待执行、执行中或可重试的任务，无法删除。请先处理相关任务。");
         }
             
         log.info("[InstanceService#deleteInstance]删除实例成功，id: {}, instanceId: {}", id, shardingDO.getInstanceId());

@@ -44,6 +44,10 @@ public class SimpleRetryTaskOperator<T> implements RetryTaskOperator<T> {
     @Transactional(rollbackFor = Exception.class, propagation = REQUIRED)
     public long createTask(RetryTaskBuilder<T> retryTaskBuilder) {
 
+        if (retryTaskBuilder.getNextPlanTimeStrategy() == null) {
+            throw new RetryException("next plan time strategy is null");
+        }
+
         RetryTask retryTask = new RetryTask();
         BeanUtils.copyProperties(retryTaskBuilder, retryTask);
 

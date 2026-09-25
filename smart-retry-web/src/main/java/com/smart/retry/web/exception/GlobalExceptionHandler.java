@@ -88,7 +88,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleRuntimeException(RuntimeException e) {
         log.error("[GlobalExceptionHandler#handleRuntimeException]运行时异常", e);
-        return Result.error("系统内部错误: " + e.getMessage());
+        return Result.error("系统异常，请联系管理员");
     }
     
     /**

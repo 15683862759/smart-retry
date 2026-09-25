@@ -8,7 +8,7 @@ import com.smart.retry.common.serializer.SmartSerializer;
 import com.smart.retry.core.config.SmartExecutorConfigure;
 import com.smart.retry.core.context.SmartContext;
 import com.smart.retry.core.identifier.MD5Identifier;
-import com.smart.retry.core.scanner.RetryScannerMannger;
+import com.smart.retry.core.scanner.RetryScannerManager;
 import com.smart.retry.core.serializer.JsonSerializer;
 import org.springframework.aop.Advisor;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -68,10 +68,9 @@ public class CommonConfiguration{
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     @Primary
-    @ConditionalOnMissingBean(RetryScannerMannger.class)
-    public RetryScannerMannger retryScannerMannger() {
-        RetryScannerMannger retryScannerMannger = new RetryScannerMannger();
-        return retryScannerMannger;
+    @ConditionalOnMissingBean(RetryScannerManager.class)
+    public RetryScannerManager retryScannerManager() {
+        return new RetryScannerManager();
     }
     @Bean
     @ConditionalOnBean({RetryConfiguration.class})

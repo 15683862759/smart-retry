@@ -53,4 +53,9 @@ public interface WebRetryShardingDao {
      * 删除实例
      */
     int deleteById(Long id);
+
+    /**
+     * 删除实例，并用活跃任务守卫避免校验与删除之间出现竞态。
+     */
+    int deleteByIdWhenNoUndeletableTasks(Long id);
 }

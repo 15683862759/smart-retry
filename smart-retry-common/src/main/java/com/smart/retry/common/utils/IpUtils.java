@@ -26,8 +26,9 @@ public class IpUtils {
     private static final Pattern IP_PATTERN = Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3,5}$");
 
     private static final Pattern IP_PORT_PATTERN = Pattern.compile(
-            "^((http|https)://)((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)(:"
-                    + "([0-9]|[1-9]\\d|[1-9]\\d{2}|[1-9]\\d{3}|[1-5]\\d{4}|6[0-4]\\d{2}|655[0-2]\\d|6553[0-5])$)");
+            "^((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}"
+                    + "(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)"
+                    + ":(6553[0-5]|655[0-2]\\d|65[0-4]\\d{2}|6[0-4]\\d{3}|[1-5]\\d{4}|[1-9]\\d{0,3})$");
 
     private static volatile InetAddress LOCAL_ADDRESS = null;
 
@@ -173,8 +174,7 @@ public class IpUtils {
         if (StringUtils.isEmpty(ipStr)) {
             return false;
         }
-        Matcher matcher = IP_PORT_PATTERN.matcher(ipStr);
-        return matcher.find();
+        return IP_PORT_PATTERN.matcher(ipStr).matches();
     }
 
     /**
@@ -205,6 +205,9 @@ public class IpUtils {
     }
 
     public static Object[] parseIpPort(String address) {
+        if (!isIPLegal(address)) {
+            throw new IllegalArgumentException("IP:端口格式非法，正确格式如 192.168.1.100:8080");
+        }
         String[] array = address.split(":");
 
         String host = array[0];

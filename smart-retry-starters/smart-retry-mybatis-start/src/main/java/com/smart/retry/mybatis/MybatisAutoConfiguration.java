@@ -151,12 +151,12 @@ public class MybatisAutoConfiguration extends CommonConfiguration
     }
     @Bean
     @ConditionalOnClass(HeartbeatContainer.class)
-    public RetryContainer retryContainer(SmartExecutorConfigure smartExecutorConfigure, HeartbeatContainer heartbeatContainer,
+    public SimpleContainer retryContainer(SmartExecutorConfigure smartExecutorConfigure, HeartbeatContainer heartbeatContainer,
                                          RetryConfiguration configuration) {
         LOGGER.info("[MybatisAutoConfiguration#retryContainer] Initializing retry container");
-        RetryContainer retryContainer = new SimpleContainer(configuration, smartExecutorConfigure);
-        retryContainer.start();
-        return retryContainer;
+        SimpleContainer simpleContainer = new SimpleContainer(configuration, smartExecutorConfigure);
+        simpleContainer.start();
+        return simpleContainer;
     }
 
 

@@ -2,6 +2,7 @@ package com.smart.retry.core;
 
 import com.smart.retry.common.RetryConfiguration;
 import com.smart.retry.common.RetryContainer;
+import com.smart.retry.common.RetryTaskEnqueuer;
 import com.smart.retry.common.SmartRetryExit;
 import com.smart.retry.common.SmartRetryRunFlag;
 import com.smart.retry.common.constant.ExecuteResultStatus;
@@ -34,7 +35,7 @@ import java.util.concurrent.*;
  * @Version SimpleContainer.java, v 0.1 2025年02月18日 00:24 xiaoqiang
  * @Description: TODO
  */
-public class SimpleContainer implements RetryContainer {
+public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
     private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(SimpleContainer.class);
 

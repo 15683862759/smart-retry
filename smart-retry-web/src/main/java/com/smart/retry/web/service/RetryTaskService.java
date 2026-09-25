@@ -2,8 +2,10 @@ package com.smart.retry.web.service;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
+import com.smart.retry.common.RetryTaskEnqueuer;
 import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.common.identifier.Identifier;
+import com.smart.retry.common.model.RetryTask;
 import com.smart.retry.common.serializer.SmartSerializer;
 import com.smart.retry.web.dao.WebRetryShardingDao;
 import com.smart.retry.web.dao.WebRetryTaskDao;
@@ -17,11 +19,11 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
-import java.text.ParseException;
 import java.util.*;
 
 /**
@@ -35,6 +37,7 @@ public class RetryTaskService {
     
     private final WebRetryTaskDao webRetryTaskDao;
     private final WebRetryShardingDao webRetryShardingDao;
+    private final ObjectProvider<RetryTaskEnqueuer> retryTaskEnqueuerProvider;
     
     private static final Gson GSON = new Gson();
     
@@ -126,6 +129,15 @@ public class RetryTaskService {
         
         // 插入数据库
         webRetryTaskDao.insert(taskDO);
+
+        // Web 与 core 位于不同模块，通过 common 接口解耦。
+        // 无调度器时保持只落库；有调度器时延迟到事务提交后入队。
+        RetryTaskEnqueuer retryTaskEnqueuer = retryTaskEnqueuerProvider.getIfAvailable();
+        if (retryTaskEnqueuer != null) {
+            RetryTask retryTask = new RetryTask();
+            BeanUtils.copyProperties(taskDO, retryTask);
+            retryTaskEnqueuer.enqueueAfterCommit(retryTask);
+        }
         
         log.info("[TaskService#createTask]创建任务成功，id: {}, taskCode: {}", taskDO.getId(), taskDO.getTaskCode());
         return taskDO.getId();
@@ -135,7 +147,7 @@ public class RetryTaskService {
      * 更新任务
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateTask(TaskUpdateRequest request) throws ParseException {
+    public void updateTask(TaskUpdateRequest request) {
         // 查询当前任务
         RetryTaskDO taskDO = webRetryTaskDao.selectById(request.getId());
         if (taskDO == null) {
@@ -149,7 +161,12 @@ public class RetryTaskService {
         
         // 只允许编辑 nextPlanTime, retryNum, param, status
         if (request.getNextPlanTime() != null) {
-            taskDO.setNextPlanTime(DateUtils.parseDate(request.getNextPlanTime(),"yyyy-MM-dd HH:mm:ss"));
+            try {
+                taskDO.setNextPlanTime(DateUtils.parseDate(request.getNextPlanTime(),
+                        "yyyy-MM-dd HH:mm:ss"));
+            } catch (java.text.ParseException e) {
+                throw new BusinessException(400, "时间格式必须为 yyyy-MM-dd HH:mm:ss");
+            }
         }
         
         if (request.getRetryNum() != null) {
