@@ -13,7 +13,11 @@ class FixedNextPlanTimeStrategy implements NextPlanTimeStrategy {
     @Override
     public Date nextExecuteTime(RetryTask retryTask) {
 
-        long nextTime = retryTask.getNextPlanTime().getTime() + retryTask.getIntervalSecond() * 1000;
+        long intervalMs = retryTask.getIntervalSecond() * 1000L;
+        long currentPlanTime = retryTask.getNextPlanTime().getTime();
+        long nextTime = currentPlanTime > Long.MAX_VALUE - intervalMs
+                ? Long.MAX_VALUE
+                : currentPlanTime + intervalMs;
         return new Date(nextTime);
     }
 }
