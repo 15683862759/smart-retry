@@ -18,7 +18,7 @@ import java.util.Map;
  * @Description TODO
  */
 public class GsonTool {
-    private static Gson GSON = null;
+    private static final Gson GSON;
     private static final Gson GSON_NULL; // 不过滤空值
 
     static {
@@ -31,16 +31,12 @@ public class GsonTool {
                 //.setPrettyPrinting() //自动格式化换行
                 .disableHtmlEscaping(); //防止特殊字符出现乱码
 
-        GSON = gsonBuilder.create();
-        // Get the date adapter
-        TypeAdapter<Date> dateTypeAdapter = GSON.getAdapter(Date.class);
+        Gson baseGson = gsonBuilder.create();
+        TypeAdapter<Date> dateTypeAdapter = baseGson.getAdapter(Date.class);
 
         // Ensure the DateTypeAdapter is null safe
         TypeAdapter<Date> safeDateTypeAdapter = dateTypeAdapter.nullSafe();
-        GSON = new GsonBuilder()
-                .enableComplexMapKeySerialization()
-                .setDateFormat("yyyy-MM-dd HH:mm:ss")
-                .disableHtmlEscaping()
+        GSON = gsonBuilder
                 .registerTypeAdapter(Date.class, safeDateTypeAdapter)
                 .create();
         GsonBuilder gsonBuilder1 = new GsonBuilder();

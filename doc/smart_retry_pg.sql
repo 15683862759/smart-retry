@@ -101,7 +101,7 @@ CREATE INDEX idx_next_plan_time ON retry_task (next_plan_time);
 CREATE INDEX idx_status_sharding_key_next_plan_time_retry_num
     ON retry_task (status,sharding_key, next_plan_time, retry_num);
 CREATE INDEX IF NOT EXISTS idx_retry_task_gmt_create_sharding_key ON retry_task(gmt_create, sharding_key);
-CREATE INDEX IF NOT EXISTS idx_unique_key ON retry_task(unique_key);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_unique_key ON retry_task(unique_key);
 
 -- ============================================================
 -- 索引说明：
@@ -111,7 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_unique_key ON retry_task(unique_key);
 -- 4. retry_task.idx_status_sharding_key_next_plan_time_retry_num:
 --    状态-分片键-下次执行时间-重试次数联合索引，用于任务分片查询
 -- 5. idx_retry_task_gmt_create_sharding_key: 创建时间-分片键索引，用于时间范围查询
--- 6. idx_unique_key: 唯一标识索引，用于任务去重
+-- 6. uk_unique_key: 唯一标识唯一索引，用于数据库层任务去重
 -- 注意：PostgreSQL 支持 CREATE INDEX IF NOT EXISTS 语法，避免重复创建
 -- ============================================================
 -- 结束

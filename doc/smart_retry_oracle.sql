@@ -100,7 +100,7 @@ CREATE INDEX idx_status_npt_rn ON retry_task (status, sharding_key,next_plan_tim
 -- idx_gmt_create_sharding_key
 CREATE INDEX idx_gmt_create_sk ON retry_task (gmt_create, sharding_key); -- 缩短索引名
 
-CREATE INDEX idx_unique_key ON retry_task (unique_key);
+CREATE UNIQUE INDEX uk_unique_key ON retry_task (unique_key);
 
 -- 添加列注释
 COMMENT ON COLUMN retry_task.id IS 'ID';
@@ -147,7 +147,7 @@ END;
 -- 3. retry_task.idx_next_plan_time: 下次执行时间索引，用于任务调度
 -- 4. retry_task.idx_status_npt_rn: 状态-分片键-下次执行时间-重试次数联合索引，用于任务分片查询
 -- 5. retry_task.idx_gmt_create_sk: 创建时间-分片键索引，用于时间范围查询
--- 6. retry_task.idx_unique_key: 唯一标识索引，用于任务去重
+-- 6. retry_task.uk_unique_key: 唯一标识唯一索引，用于数据库层任务去重
 -- ============================================================
 -- 序列和触发器说明：
 -- 1. seq_retry_sharding_id: retry_sharding 表自增序列，起始值 1

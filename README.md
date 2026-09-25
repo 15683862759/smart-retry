@@ -243,7 +243,7 @@ CREATE TABLE `retry_task` (
   KEY `idx_next_plan_time` (`next_plan_time`),
   KEY `idx_status_sharding_key_next_plan_time_retry_num` (`status`,sharding_key,`next_plan_time`,`retry_num`),
   KEY `idx_gmt_create_sharding_key` (`gmt_create`,`sharding_key`),
-  KEY `idx_unique_key` (`unique_key`)
+  UNIQUE KEY `uk_unique_key` (`unique_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='重试任务表';
 
 ```

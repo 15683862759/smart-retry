@@ -32,7 +32,8 @@ public class JsonSerializer implements SmartSerializer {
         for (int i = 0; i < args.length; i++) {
             SerializerObject serializerObject = new SerializerObject();
             serializerObject.setIndex(i);
-            serializerObject.setParamName(names[i]);
+            String paramName = names == null ? null : names[i];
+            serializerObject.setParamName(paramName == null ? parameters[i].getName() : paramName);
             serializerObject.setParamVal(GsonTool.toJsonStringIgnoreNull(args[i]));
             serializerObject.setClassName(parameters[i].getParameterizedType().getTypeName());
             objectList.add(serializerObject);
@@ -54,6 +55,9 @@ public class JsonSerializer implements SmartSerializer {
         Object[] args = new Object[parameters.length];
         for (SerializerObject serializerObject : paramValList) {
             Integer index = serializerObject.getIndex();
+            if (index == null || index < 0 || index >= parameters.length) {
+                continue;
+            }
             Parameter parameter = parameters[index];
             Type type = TypeToken.get(parameter.getParameterizedType()).getType();
             Object objectVal = GsonTool.fromJson(serializerObject.getParamVal(), type);

@@ -54,7 +54,7 @@
 - `idx_next_plan_time` - 下次执行时间索引
 - `idx_status_sharding_key_next_plan_time_retry_num` - 状态-分片键-下次执行时间-重试次数联合索引
 - `idx_gmt_create_sharding_key` - 创建时间-分片键索引
-- `idx_unique_key` - 唯一标识索引
+- `uk_unique_key` - 唯一标识唯一索引
 
 ## 使用指南
 

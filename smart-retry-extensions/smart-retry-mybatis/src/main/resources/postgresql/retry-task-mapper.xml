@@ -291,6 +291,15 @@
         )
     </delete>
 
+    <!-- 批量删除任务 -->
+    <delete id="batchDeleteByIds">
+        DELETE FROM retry_task
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
     <!-- 重启任务：把失败任务重置为待执行，保留 current_log_id 不动 -->
     <update id="restartRetryTask">
         UPDATE retry_task
@@ -299,6 +308,17 @@
             retry_num = #{targetRetryNum},
             next_plan_time = #{nextPlanTime}
         WHERE id = #{id}
+    </update>
+
+    <!-- 原子停止任务：清空 executor 使旧执行线程的终态 CAS 失效。 -->
+    <update id="stopTask">
+        UPDATE retry_task
+        SET status = 3,
+            retry_num = 0,
+            executor = NULL,
+            gmt_modified = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND status IN (0, 1, 3)
     </update>
 
 </mapper>
