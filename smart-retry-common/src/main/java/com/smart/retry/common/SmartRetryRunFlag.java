@@ -8,7 +8,7 @@ package com.smart.retry.common;
  */
 public class SmartRetryRunFlag {
 
-    private static volatile Boolean flag = false;
+    private static volatile boolean flag = false;
 
 
     /**
@@ -26,6 +26,9 @@ public class SmartRetryRunFlag {
      * @param flag true 表示允许调度；false 用于停机或测试重置
      */
     public static void setFlag(Boolean flag) {
+        if (flag == null) {
+            throw new IllegalArgumentException("调度开关不能为空");
+        }
         SmartRetryRunFlag.flag = flag;
     }
 
