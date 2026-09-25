@@ -66,6 +66,7 @@ public class RetryTaskService {
         query.setId(request.getId());
         query.setTaskCode(request.getTaskCode());
         query.setTaskDesc(request.getTaskDesc());
+        query.setCreator(request.getCreator());
         query.setStatus(request.getStatus());
         query.setShardingKeyList(request.getShardingKey() != null ? 
                 Collections.singletonList(request.getShardingKey()) : null);

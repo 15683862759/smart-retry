@@ -89,6 +89,37 @@ public class RetryTaskServiceTest {
         }
     }
 
+    @Test
+    public void queryTasksPassesCreatorConditionToDao() {
+        AtomicReference<Object> queryRef = new AtomicReference<>();
+        WebRetryTaskDao taskDao = (WebRetryTaskDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryTaskDao.class},
+                (proxy, method, args) -> {
+                    if ("countByQuery".equals(method.getName())) {
+                        queryRef.set(args[0]);
+                        return 0;
+                    }
+                    return null;
+                });
+        WebRetryShardingDao shardingDao = (WebRetryShardingDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryShardingDao.class},
+                (proxy, method, args) -> null);
+        ObjectProvider<RetryTaskEnqueuer> enqueuerProvider = (ObjectProvider<RetryTaskEnqueuer>) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{ObjectProvider.class},
+                (proxy, method, args) -> null);
+
+        TaskQueryRequest request = new TaskQueryRequest();
+        request.setCreator("custom");
+
+        new RetryTaskService(taskDao, shardingDao, enqueuerProvider).queryTasks(request);
+
+        Assert.assertNotNull(queryRef.get());
+        Assert.assertEquals("custom", ((RetryTaskQuery) queryRef.get()).getCreator());
+    }
+
     private WebRetryShardingDao proxyShardingDao(List<RetryShardingDO> firstPage,
                                                   List<RetryShardingDO> secondPage) {
         return (WebRetryShardingDao) Proxy.newProxyInstance(
