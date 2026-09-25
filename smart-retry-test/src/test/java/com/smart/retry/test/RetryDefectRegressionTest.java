@@ -366,6 +366,38 @@ public class RetryDefectRegressionTest extends AbstractTest {
     }
 
     @Test
+    public void testWebCreateTaskDuplicateActiveParamReturnsBusinessError() {
+        String param = "{\"value\":\"web-duplicate-" + System.nanoTime() + "\"}";
+
+        TaskCreateRequest request = new TaskCreateRequest();
+        request.setTaskCode(TASK_CODE);
+        request.setTaskDesc("Web创建任务重复参数测试");
+        request.setRetryNum(1);
+        request.setDelaySecond(3600);
+        request.setIntervalSecond(60);
+        request.setParam(param);
+        request.setShardingKey(ShardingContextHolder.getRandomShardingIndex());
+        request.setNextPlanTimeStrategy(NextPlanTimeStrategyEnum.FIXED.getCode());
+
+        Long firstTaskId = retryTaskService.createTask(request);
+        Assert.assertNotNull(firstTaskId);
+        Assert.assertTrue(firstTaskId > 0);
+
+        try {
+            retryTaskService.createTask(request);
+            Assert.fail("重复创建活跃任务应返回业务异常");
+        } catch (BusinessException expected) {
+            Assert.assertEquals(Integer.valueOf(400), expected.getCode());
+            Assert.assertEquals("相同参数的活跃任务已存在", expected.getMessage());
+        }
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM retry_task WHERE parameters = ?",
+                Integer.class, param);
+        Assert.assertEquals("重复参数只允许保留一条活跃任务", Integer.valueOf(1), count);
+    }
+
+    @Test
     public void testDeleteShardingIsRejectedWhileActiveTaskExists() {
         String uniqueKey = "atomic-delete-" + System.nanoTime();
         Long shardingId = null;

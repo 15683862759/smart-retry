@@ -20,6 +20,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -154,8 +155,12 @@ public class RetryTaskService {
         calendar.add(Calendar.SECOND, request.getDelaySecond());
         taskDO.setNextPlanTime(calendar.getTime());
         
-        // 插入数据库
-        webRetryTaskDao.insert(taskDO);
+        // 插入数据库；唯一键冲突说明相同 taskCode + 参数的活跃任务已存在。
+        try {
+            webRetryTaskDao.insert(taskDO);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(400, "相同参数的活跃任务已存在");
+        }
 
         // Web 与 core 位于不同模块，通过 common 接口解耦。
         // 无调度器时保持只落库；有调度器时延迟到事务提交后入队。
