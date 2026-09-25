@@ -1,16 +1,18 @@
 package com.smart.retry.core.scanner;
 
-import com.google.common.collect.Maps;
 import com.smart.retry.common.annotation.RetryOnMethod;
 import com.smart.retry.common.constant.RetryTaskTypeEnum;
 import com.smart.retry.common.exception.RetryException;
 import com.smart.retry.common.model.RetryTaskObject;
 import com.smart.retry.common.scanner.RetryScanner;
 import com.smart.retry.core.cache.RetryCache;
+import com.smart.retry.core.util.RetryTaskCodeBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,14 +40,52 @@ public class RetryMethodScanner implements RetryScanner {
      * @param applicationContext Spring 应用上下文
      */
     public void scan(ApplicationContext applicationContext) {
-        String[] allBeanNames = applicationContext.getBeanDefinitionNames();
-        for (String beanName : allBeanNames) {
-            Object bean = applicationContext.getBean(beanName);
-
-            //1、查找标有注解@see RetryableOnMethod 的方法
-            resolveMethodAnnotation(bean, applicationContext);
+        if (!(applicationContext instanceof ConfigurableApplicationContext)) {
+            scanAllBeans(applicationContext);
+            return;
         }
 
+        ConfigurableListableBeanFactory beanFactory =
+                ((ConfigurableApplicationContext) applicationContext).getBeanFactory();
+        for (String beanName : applicationContext.getBeanDefinitionNames()) {
+            if (beanFactory.getBeanDefinition(beanName).isAbstract()) {
+                continue;
+            }
+            Class<?> beanType = beanFactory.getType(beanName, false);
+            if (beanType == null || findRetryMethods(beanType).isEmpty()) {
+                continue;
+            }
+
+            // 只有包含重试方法的 Bean 才实例化，避免提前创建无关 lazy Bean。
+            resolveMethodAnnotation(applicationContext.getBean(beanName), applicationContext);
+        }
+    }
+
+    /**
+     * 兼容不可配置上下文的兜底扫描路径。
+     *
+     * @param applicationContext Spring 应用上下文
+     */
+    private void scanAllBeans(ApplicationContext applicationContext) {
+        for (String beanName : applicationContext.getBeanDefinitionNames()) {
+            resolveMethodAnnotation(applicationContext.getBean(beanName), applicationContext);
+        }
+    }
+
+    /**
+     * 查找类型中标注 {@link RetryOnMethod} 的方法。
+     *
+     * @param beanType Bean 的目标类型
+     * @return 方法到注解的映射
+     */
+    private Map<Method, RetryOnMethod> findRetryMethods(Class<?> beanType) {
+        return MethodIntrospector.selectMethods(beanType,
+                new MethodIntrospector.MetadataLookup<RetryOnMethod>() {
+                    @Override
+                    public RetryOnMethod inspect(Method method) {
+                        return AnnotationUtils.findAnnotation(method, RetryOnMethod.class);
+                    }
+                });
     }
 
 
@@ -57,20 +97,14 @@ public class RetryMethodScanner implements RetryScanner {
      * @param applicationContext Spring 上下文，用于事务代理目标对象解析
      */
     private void resolveMethodAnnotation(Object bean,ApplicationContext applicationContext) {
-        Map<Method, RetryOnMethod> methodTMap = MethodIntrospector.selectMethods(bean.getClass(),
-                new MethodIntrospector.MetadataLookup<RetryOnMethod>() {
-                    @Override
-                    public RetryOnMethod inspect(Method method) {
-                        return AnnotationUtils.findAnnotation(method, RetryOnMethod.class);
-                    }
-                });
+        Map<Method, RetryOnMethod> methodTMap = findRetryMethods(bean.getClass());
         if (methodTMap == null || methodTMap.isEmpty()) {
             return;
         }
 
 
         methodTMap.forEach((method, retryOnMethod) -> {
-            String taskCode = method.getDeclaringClass().getName() + "#" + method.getName();
+            String taskCode = RetryTaskCodeBuilder.build(method);
             checkExceptionConfiguration(taskCode, retryOnMethod);
             boolean hasTransactional = method.isAnnotationPresent(Transactional.class) ||
                     method.getDeclaringClass().isAnnotationPresent(Transactional.class);

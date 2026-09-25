@@ -12,6 +12,7 @@ import com.smart.retry.common.utils.IpUtils;
 import com.smart.retry.common.utils.LogIdUtils;
 import com.smart.retry.core.ShardingContextHolder;
 import com.smart.retry.core.SimpleContainer;
+import com.smart.retry.core.util.RetryTaskCodeBuilder;
 import org.aopalliance.intercept.MethodInvocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +87,7 @@ public class RemoteRetryer implements IRetryer {
         retryTask.setCreator(IpUtils.getIp());
         retryTask.setStatus(RetryTaskStatus.WAITING.getCode());
         Method method = methodInvocation.getMethod();
-        String taskCode = method.getDeclaringClass().getName() + "#" + method.getName();
+        String taskCode = RetryTaskCodeBuilder.build(method);
         retryTask.setTaskCode(taskCode);
         retryTask.setParameters(getArgs());
         retryTask.setUniqueKey(getUniqueKey(taskCode, getArgs()));

@@ -23,35 +23,33 @@ public class GsonTool {
     private static final Gson GSON_NULL; // 不过滤空值
 
     static {
-        GsonBuilder gsonBuilder = new GsonBuilder();
+        GsonBuilder gsonBuilder = createBaseBuilder(false);
+        TypeAdapter<Date> dateTypeAdapter = gsonBuilder.create().getAdapter(Date.class);
 
-        gsonBuilder.enableComplexMapKeySerialization() //当 Map 的 key 为复杂对象时，需要开启该方法
-                //.serializeNulls() //当字段值为空或 null 时，依然对该字段进行转换
-                //.excludeFieldsWithoutExposeAnnotation()//打开 Export 注解，但打开了这个注解，副作用，要转换和不转换都要加注解
-                .setDateFormat("yyyy-MM-dd HH:mm:ss")//序列化日期格式  "yyyy-MM-dd"
-                //.setPrettyPrinting() //自动格式化换行
-                .disableHtmlEscaping(); //防止特殊字符出现乱码
-
-        Gson baseGson = gsonBuilder.create();
-        TypeAdapter<Date> dateTypeAdapter = baseGson.getAdapter(Date.class);
-
-        // Ensure the DateTypeAdapter is null safe
+        // 确保日期适配器遇到 null 时不抛错。
         TypeAdapter<Date> safeDateTypeAdapter = dateTypeAdapter.nullSafe();
         GSON = gsonBuilder
                 .registerTypeAdapter(Date.class, safeDateTypeAdapter)
                 .create();
-        GsonBuilder gsonBuilder1 = new GsonBuilder();
-
-        gsonBuilder1.enableComplexMapKeySerialization() //当 Map 的 key 为复杂对象时，需要开启该方法
-                .serializeNulls() //当字段值为空或 null 时，依然对该字段进行转换
-                //.excludeFieldsWithoutExposeAnnotation()//打开 Export 注解，但打开了这个注解，副作用，要转换和不转换都要加注解
-                .setDateFormat("yyyy-MM-dd HH:mm:ss")//序列化日期格式  "yyyy-MM-dd"
-                //.setPrettyPrinting() //自动格式化换行
-                .disableHtmlEscaping(); //防止特殊字符出现乱码
-
-        GSON_NULL = gsonBuilder1
+        GSON_NULL = createBaseBuilder(true)
                 .registerTypeAdapter(Date.class, safeDateTypeAdapter)
                 .create();
+    }
+
+    /**
+     * 创建基础 Gson 构建器，统一两个解析器的日期格式和复杂 Map key 规则。
+     *
+     * @param serializeNulls 是否保留 null 字段
+     * @return 已完成基础配置的构建器
+     */
+    private static GsonBuilder createBaseBuilder(boolean serializeNulls) {
+        GsonBuilder builder = new GsonBuilder();
+        if (serializeNulls) {
+            builder.serializeNulls();
+        }
+        return builder.enableComplexMapKeySerialization()
+                .setDateFormat("yyyy-MM-dd HH:mm:ss")
+                .disableHtmlEscaping();
     }
 
     //获取gson解析器

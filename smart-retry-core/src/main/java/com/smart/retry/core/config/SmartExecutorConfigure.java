@@ -60,6 +60,9 @@ public class SmartExecutorConfigure {
         }
 
         public void setInterval(int interval) {
+            if (interval < 1) {
+                throw new IllegalArgumentException("health interval must be greater than 0");
+            }
             this.interval = interval;
         }
 
@@ -68,6 +71,9 @@ public class SmartExecutorConfigure {
         }
 
         public void setTimeout(int timeout) {
+            if (timeout < 1) {
+                throw new IllegalArgumentException("health timeout must be greater than 0");
+            }
             this.timeout = timeout;
         }
 
@@ -76,6 +82,9 @@ public class SmartExecutorConfigure {
         }
 
         public void setScanInterval(int scanInterval) {
+            if (scanInterval < 1) {
+                throw new IllegalArgumentException("health scanInterval must be greater than 0");
+            }
             this.scanInterval = scanInterval;
         }
     }

@@ -3,6 +3,7 @@ package com.smart.retry.core.scanner;
 import com.smart.retry.common.RetryListener;
 import com.smart.retry.common.annotation.RetryOnClass;
 import com.smart.retry.common.constant.RetryTaskTypeEnum;
+import com.smart.retry.common.exception.RetryException;
 import com.smart.retry.common.model.RetryTaskObject;
 import com.smart.retry.common.scanner.RetryScanner;
 import com.smart.retry.core.cache.RetryCache;
@@ -11,6 +12,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @Author xiaoqiang
@@ -56,27 +59,19 @@ public class RetryClassScanner implements RetryScanner {
                 RetryTaskObject.of().withBeanObj(bean)
                         .withRetryTaskNotify(retryableOnClass.retryTaskNotifies())
                         .withRetryType(RetryTaskTypeEnum.CLASS);
-        Method[] methods = bean.getClass().getMethods();
-        Method targetMethod = null;
-        for (Method method : methods) {
-            String methodName = method.getName();
-            if (StringUtils.equals(methodName, "consume")) {
-                retryTaskObject.withMethod(method);
-                targetMethod = method;
-                break;
+        List<Method> consumeMethods = new ArrayList<>();
+        for (Method method : bean.getClass().getMethods()) {
+            if (StringUtils.equals(method.getName(), "consume")
+                    && !method.isBridge() && !method.isSynthetic()) {
+                consumeMethods.add(method);
             }
         }
-        /*boolean hasTransactional = targetMethod.isAnnotationPresent(Transactional.class) ||
-                targetMethod.getDeclaringClass().isAnnotationPresent(Transactional.class);
-        Object proxy = bean;
-        if (hasTransactional) {
-            Class<?> beanType = AopUtils.getTargetClass(bean); // 处理代理类获取真实类型
-            proxy = applicationContext.getBean(beanType);
+        if (consumeMethods.size() != 1) {
+            throw new RetryException(String.format(
+                    "retry listener %s must declare exactly one non-synthetic consume method, found %s",
+                    bean.getClass().getName(), consumeMethods.size()));
         }
-        retryTaskObject.withBeanObj(proxy)
-                .withRetryTaskNotify(retryableOnClass.retryTaskNotifies())
-                .withParams(targetMethod.getParameters())
-                .withRetryType(RetryTaskTypeEnum.METHOD);*/
+        retryTaskObject.withMethod(consumeMethods.get(0));
         String taskCode = retryableOnClass.taskCode();
         RetryCache.put(taskCode, retryTaskObject);
     }
