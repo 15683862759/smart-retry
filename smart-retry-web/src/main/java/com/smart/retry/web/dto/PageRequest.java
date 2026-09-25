@@ -13,10 +13,11 @@ import javax.validation.constraints.NotNull;
 public class PageRequest {
 
     /**
-     * 页码，从 1 开始
+     * 页码，从 1 开始；限制最大值避免 offset 计算溢出
      */
     @NotNull
     @Min(1)
+    @Max(1_000_000)
     private Integer pageNum = 1;
 
     /**

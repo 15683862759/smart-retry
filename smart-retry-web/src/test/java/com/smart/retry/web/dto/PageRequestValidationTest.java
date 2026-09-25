@@ -43,6 +43,15 @@ public class PageRequestValidationTest {
     }
 
     @Test
+    public void testPageRequestRejectsOversizedPageNum() {
+        PageRequest request = new PageRequest();
+        request.setPageNum(1_000_001);
+        request.setPageSize(200);
+
+        assertFalse(validator.validate(request).isEmpty());
+    }
+
+    @Test
     public void testQueryControllerMethodsEnableValidation() throws Exception {
         Method queryTasks = RetryTaskController.class.getMethod(
                 "queryTasks", com.smart.retry.web.dto.task.TaskQueryRequest.class);
