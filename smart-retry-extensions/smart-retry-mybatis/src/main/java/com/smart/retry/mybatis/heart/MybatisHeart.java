@@ -161,7 +161,7 @@ public class MybatisHeart implements RetryTaskHeart {
     /**
      * 启动心跳后台线程。重复调用时保留首个线程，避免产生多个心跳循环。
      */
-    public void heartBeat() {
+    public synchronized void heartBeat() {
         if (heartbeatThread != null) {
             return;
         }
@@ -177,7 +177,7 @@ public class MybatisHeart implements RetryTaskHeart {
      * 启动死分片扫描后台线程。重复调用时保留首个线程，避免重复抢占。
      */
     @Override
-    public void scrambleDeadSharding() {
+    public synchronized void scrambleDeadSharding() {
         if (scrambleDeadShardingThread != null) {
             return;
         }
