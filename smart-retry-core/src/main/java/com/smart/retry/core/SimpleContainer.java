@@ -135,6 +135,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
             // 初始化预加载窗口
             preloadWindowMs = (long) smartConfigure.getTaskFindInterval() * smartConfigure.getScanPreloadMultiplier() * 1000L;
+            containerRunning = true;
 
             // Producer 兜底扫描线程（低频，仅加载到 DelayQueue）
             producerThread = new Thread(new ProducerTask(), "smart-retry-producer");
@@ -155,7 +156,6 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                 CronTrigger trigger = new CronTrigger(smartConfigure.getClearTask().getCron());
                 taskScheduler.schedule(new ClearTask(), trigger);
             }
-            containerRunning = true;
         }
     }
 
@@ -203,7 +203,6 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                 return;
             }
             containerRunning = false;
-            SmartRetryRunFlag.setFlag(false);
 
             if (schedulerThread != null) {
                 schedulerThread.interrupt();
@@ -232,6 +231,17 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             consumerQueue = null;
             taskScheduler = null;
         }
+        CONTAINERS.remove(retryConfiguration, this);
+        SmartRetryRunFlag.setFlag(hasRunningContainer());
+    }
+
+    private static boolean hasRunningContainer() {
+        for (SimpleContainer container : CONTAINERS.values()) {
+            if (container.containerRunning) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static String getUniqueKey(RetryTask retryTask) {
@@ -391,7 +401,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             RetryTaskCache.unmark(key);
             return false;
         }
-        if (!containerRunning || !SmartRetryRunFlag.getFlag()) {
+        if (!containerRunning) {
             RetryTaskCache.unmark(key);
             return false;
         }
@@ -452,7 +462,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
     class SchedulerThread implements Runnable {
         @Override
         public void run() {
-            while (SmartRetryExit.isExit() && SmartRetryRunFlag.getFlag()) {
+            while (SmartRetryExit.isExit() && containerRunning) {
                 try {
                     ScheduledTask scheduled = delayQueue.take();  // 阻塞取第一个
                     List<ScheduledTask> batch = new ArrayList<>(101);
@@ -528,8 +538,8 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         @Override
         public void run() {
 
-            while (SmartRetryExit.isExit() && SmartRetryRunFlag.getFlag()) {
-                if (!SmartRetryExit.isExit()) {
+            while (SmartRetryExit.isExit() && containerRunning) {
+                if (!containerRunning) {
                     return;
                 }
                 try {
@@ -594,8 +604,8 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
         public void run() {
 
             LOGGER.info("[ProducerTask#run] start run producer task,sleepBaseTimeMilliseconds {}", sleepBaseTimeMilliseconds);
-            while (SmartRetryExit.isExit() && SmartRetryRunFlag.getFlag()) {
-                if (!SmartRetryRunFlag.getFlag()) {
+            while (SmartRetryExit.isExit() && containerRunning) {
+                if (!containerRunning) {
                     sleepOneInterval();
                     continue;
                 }

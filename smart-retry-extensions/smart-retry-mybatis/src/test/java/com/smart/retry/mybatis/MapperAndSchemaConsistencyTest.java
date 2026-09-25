@@ -72,6 +72,7 @@ public class MapperAndSchemaConsistencyTest {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
         factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
         return factory.newDocumentBuilder().parse(path.toFile());
     }
 
