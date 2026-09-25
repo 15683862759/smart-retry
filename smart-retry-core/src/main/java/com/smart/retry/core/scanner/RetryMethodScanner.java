@@ -105,7 +105,7 @@ public class RetryMethodScanner implements RetryScanner {
 
         methodTMap.forEach((method, retryOnMethod) -> {
             String taskCode = RetryTaskCodeBuilder.build(method);
-            checkExceptionConfiguration(taskCode, retryOnMethod);
+            checkRetryConfiguration(taskCode, retryOnMethod);
             boolean hasTransactional = method.isAnnotationPresent(Transactional.class) ||
                     method.getDeclaringClass().isAnnotationPresent(Transactional.class);
             Object proxy = bean;
@@ -145,6 +145,22 @@ public class RetryMethodScanner implements RetryScanner {
                             taskCode, include.getName(), exclude.getName()));
                 }
             }
+        }
+    }
+
+    /**
+     * 校验方法级重试注解的完整运行配置。
+     *
+     * @param taskCode      任务编码，用于错误定位
+     * @param retryOnMethod 方法重试配置
+     * @throws RetryException 异常集合重叠或执行间隔非法
+     */
+    static void checkRetryConfiguration(String taskCode, RetryOnMethod retryOnMethod) {
+        checkExceptionConfiguration(taskCode, retryOnMethod);
+        if (retryOnMethod.intervalSecond() <= 0) {
+            throw new RetryException(String.format(
+                    "retry task %s intervalSecond must be positive, current=%d",
+                    taskCode, retryOnMethod.intervalSecond()));
         }
     }
 

@@ -54,8 +54,8 @@ public @interface RetryOnMethod {
     int firstDelaySecond() default 10;
 
     /**
-     * 间隔时间
-     * @return
+     * 间隔时间，单位秒；必须大于 0
+     * @return 下次执行的基础间隔
      */
     int intervalSecond() default 180;
 

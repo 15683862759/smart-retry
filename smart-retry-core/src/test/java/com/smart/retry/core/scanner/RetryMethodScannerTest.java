@@ -94,6 +94,30 @@ public class RetryMethodScannerTest {
         Assertions.assertTrue(exception.getMessage().contains("RuntimeException"));
     }
 
+    @Test
+    void rejectsNonPositiveIntervalSecond() {
+        Method method = method("nonPositiveInterval");
+
+        RetryException exception = Assertions.assertThrows(RetryException.class, () ->
+                RetryMethodScanner.checkRetryConfiguration("test-task", method.getAnnotation(RetryOnMethod.class)));
+        Assertions.assertTrue(exception.getMessage().contains("intervalSecond must be positive"));
+    }
+
+    @Test
+    void scanRejectsNonPositiveIntervalSecond() {
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext();
+        applicationContext.register(InvalidIntervalConfiguration.class);
+        applicationContext.refresh();
+        try {
+            RetryException exception = Assertions.assertThrows(RetryException.class,
+                    () -> new RetryMethodScanner().scan(applicationContext));
+
+            Assertions.assertTrue(exception.getMessage().contains("intervalSecond must be positive"));
+        } finally {
+            applicationContext.close();
+        }
+    }
+
     private static Method method(String name) {
         Method method = Assertions.assertDoesNotThrow(() -> RetryMethodScannerTest.class.getDeclaredMethod(name));
         Assertions.assertNotNull(method.getAnnotation(RetryOnMethod.class));
@@ -110,6 +134,10 @@ public class RetryMethodScannerTest {
 
     @RetryOnMethod(include = IllegalStateException.class, exclude = RuntimeException.class)
     private void hierarchyTypes() {
+    }
+
+    @RetryOnMethod(intervalSecond = 0)
+    private void nonPositiveInterval() {
     }
 
     private static class SingleMethodCase {
@@ -151,6 +179,22 @@ public class RetryMethodScannerTest {
 
     static class RetryMethodBean {
         @RetryOnMethod
+        public void execute() {
+        }
+    }
+
+    @Configuration
+    static class InvalidIntervalConfiguration {
+
+        @Bean
+        InvalidIntervalBean invalidIntervalBean() {
+            return new InvalidIntervalBean();
+        }
+    }
+
+    static class InvalidIntervalBean {
+
+        @RetryOnMethod(intervalSecond = -1)
         public void execute() {
         }
     }
