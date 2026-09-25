@@ -58,6 +58,18 @@ public class SimpleContainerLifecycleTest {
                 "全部容器销毁后不应残留生产者线程");
     }
 
+    @Test
+    void destroyRemovesContainerThatWasNeverStarted() {
+        TestConfiguration configuration = new TestConfiguration(emptyTaskAccess());
+        SimpleContainer container = new SimpleContainer(configuration, new SmartExecutorConfigure());
+
+        container.destroy();
+
+        Assertions.assertThrows(IllegalStateException.class,
+                () -> SimpleContainer.getContainer(configuration),
+                "未启动容器销毁后也应从配置绑定表中移除");
+    }
+
     private static RetryTaskAccess emptyTaskAccess() {
         return (RetryTaskAccess) Proxy.newProxyInstance(
                 RetryTaskAccess.class.getClassLoader(),

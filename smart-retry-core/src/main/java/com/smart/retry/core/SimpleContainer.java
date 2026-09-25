@@ -199,37 +199,37 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
     @Override
     public void destroy() {
         synchronized (this) {
-            if (!containerRunning) {
-                return;
-            }
-            containerRunning = false;
+            boolean wasRunning = containerRunning;
+            if (wasRunning) {
+                containerRunning = false;
 
-            if (schedulerThread != null) {
-                schedulerThread.interrupt();
-            }
-            if (producerThread != null) {
-                producerThread.interrupt();
-            }
-            if (deadLetterThread != null) {
-                deadLetterThread.interrupt();
-            }
-            if (consumerExecutor != null) {
-                consumerExecutor.shutdownNow();
-            }
-            if (taskScheduler != null) {
-                taskScheduler.shutdown();
-            }
+                if (schedulerThread != null) {
+                    schedulerThread.interrupt();
+                }
+                if (producerThread != null) {
+                    producerThread.interrupt();
+                }
+                if (deadLetterThread != null) {
+                    deadLetterThread.interrupt();
+                }
+                if (consumerExecutor != null) {
+                    consumerExecutor.shutdownNow();
+                }
+                if (taskScheduler != null) {
+                    taskScheduler.shutdown();
+                }
 
-            delayQueue.clear();
-            RetryCache.clear();
-            RetryTaskCache.clear();
+                delayQueue.clear();
+                RetryCache.clear();
+                RetryTaskCache.clear();
 
-            schedulerThread = null;
-            producerThread = null;
-            deadLetterThread = null;
-            consumerExecutor = null;
-            consumerQueue = null;
-            taskScheduler = null;
+                schedulerThread = null;
+                producerThread = null;
+                deadLetterThread = null;
+                consumerExecutor = null;
+                consumerQueue = null;
+                taskScheduler = null;
+            }
         }
         CONTAINERS.remove(retryConfiguration, this);
         SmartRetryRunFlag.setFlag(hasRunningContainer());
