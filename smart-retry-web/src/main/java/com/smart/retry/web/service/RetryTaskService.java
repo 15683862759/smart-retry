@@ -316,8 +316,19 @@ public class RetryTaskService {
      * @return 实例与分片选项列表
      */
     public List<ShardingOptionVO> getShardingOptions() {
-        // 查询所有分片
-        List<RetryShardingDO> shardingList = webRetryShardingDao.selectAllWithPage(0, 1000, null, null);
+        // 分页读取所有分片，避免实例数量超过一页时选项被截断。
+        int pageSize = 1000;
+        int offset = 0;
+        List<RetryShardingDO> shardingList = new ArrayList<>();
+        while (true) {
+            List<RetryShardingDO> page = webRetryShardingDao.selectAllWithPage(
+                    offset, pageSize, null, null);
+            shardingList.addAll(page);
+            if (page.size() < pageSize) {
+                break;
+            }
+            offset += pageSize;
+        }
         
         // 按instanceId分组，每个instanceId取id最小的shardingKey
         Map<String, RetryShardingDO> instanceMap = new HashMap<>();
