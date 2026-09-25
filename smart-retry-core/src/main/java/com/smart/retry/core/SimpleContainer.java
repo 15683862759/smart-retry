@@ -625,8 +625,6 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
                 if (!smartConfigure.getDeadTask().getDeadTaskCheck()) {
                     continue;

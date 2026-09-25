@@ -179,6 +179,9 @@ public class SmartExecutorConfigure {
         }
 
         public void setTaskMaxExecuteTimeout(int taskMaxExecuteTimeout) {
+            if (taskMaxExecuteTimeout < 1) {
+                throw new IllegalArgumentException("taskMaxExecuteTimeout must be greater than 0");
+            }
             this.taskMaxExecuteTimeout = taskMaxExecuteTimeout;
         }
 

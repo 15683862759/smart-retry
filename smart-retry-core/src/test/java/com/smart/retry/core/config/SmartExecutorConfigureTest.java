@@ -26,4 +26,21 @@ public class SmartExecutorConfigureTest {
         Assertions.assertEquals(1, health.getTimeout());
         Assertions.assertEquals(1, health.getScanInterval());
     }
+
+    @Test
+    void rejectsInvalidDeadTaskTimeout() {
+        SmartExecutorConfigure.DeadTask deadTask = new SmartExecutorConfigure.DeadTask();
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> deadTask.setTaskMaxExecuteTimeout(0));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> deadTask.setTaskMaxExecuteTimeout(-1));
+    }
+
+    @Test
+    void acceptsPositiveDeadTaskTimeout() {
+        SmartExecutorConfigure.DeadTask deadTask = new SmartExecutorConfigure.DeadTask();
+
+        deadTask.setTaskMaxExecuteTimeout(1);
+
+        Assertions.assertEquals(1, deadTask.getTaskMaxExecuteTimeout());
+    }
 }
