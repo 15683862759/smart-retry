@@ -20,7 +20,14 @@ class FibonacciNextPlanTimeStrategy implements NextPlanTimeStrategy {
 
         long retryNum = retryTask.getOriginRetryNum() - retryTask.getRetryNum() + 1;
         long fibonacciNum = fib(retryNum);
-        long nextTime = retryTask.getNextPlanTime().getTime() + fibonacciNum * retryTask.getIntervalSecond() * 1000;
+        long intervalMs = retryTask.getIntervalSecond() * 1000L;
+        long cappedFibonacciNum = Math.min(fibonacciNum,
+                Long.MAX_VALUE / Math.max(1L, intervalMs));
+        long fibonacciIntervalMs = cappedFibonacciNum * intervalMs;
+        long currentPlanTime = retryTask.getNextPlanTime().getTime();
+        long nextTime = currentPlanTime > Long.MAX_VALUE - fibonacciIntervalMs
+                ? Long.MAX_VALUE
+                : currentPlanTime + fibonacciIntervalMs;
         return new Date(nextTime);
     }
 
@@ -32,15 +39,17 @@ class FibonacciNextPlanTimeStrategy implements NextPlanTimeStrategy {
         } else {
             long prevPrev = 0L;
             long prev = 1L;
-            long result = 0L;
 
             for (long i = 2L; i <= n; ++i) {
-                result = prev + prevPrev;
+                if (prev > Long.MAX_VALUE - prevPrev) {
+                    return Long.MAX_VALUE;
+                }
+                long result = prev + prevPrev;
                 prevPrev = prev;
                 prev = result;
             }
 
-            return result;
+            return prev;
         }
     }
 }
