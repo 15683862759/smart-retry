@@ -4,6 +4,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Gson 工具泛型反序列化测试。
@@ -29,5 +30,19 @@ public class GsonToolTest {
 
         Assert.assertEquals(Integer.valueOf(3), values.get(0));
         Assert.assertEquals(Integer.valueOf(4), values.get(1));
+    }
+
+    @Test
+    public void strToListMapsUsesDeclaredValueType() {
+        List<Map<String, Integer>> values = GsonTool.strToListMaps("[{\"count\":5}]", Integer.class);
+
+        Assert.assertEquals(Integer.valueOf(5), values.get(0).get("count"));
+    }
+
+    @Test
+    public void strToMapsUsesDeclaredValueType() {
+        Map<String, Integer> values = GsonTool.strToMaps("{\"count\":6}", Integer.class);
+
+        Assert.assertEquals(Integer.valueOf(6), values.get("count"));
     }
 }

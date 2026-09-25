@@ -120,10 +120,28 @@ public class GsonTool {
      *
      * @param gsonString
      * @return
+     * @deprecated 泛型 T 无法在运行期保留，实际元素类型由本方法内部固定决定。
+     * 请改用 {@link #strToListMaps(String, Class)}，显式指定 Map 值类型。
      */
+    @Deprecated
     public static <T> List<Map<String, T>> strToListMaps(String gsonString) {
         return GSON.fromJson(gsonString, new TypeToken<List<Map<String, String>>>() {
         }.getType());
+    }
+
+    /**
+     * 将 JSON 数组转换为 List<Map<String, valueClass>>。
+     *
+     * <p>与 {@link #strToList(String, Class)} 相同，方法内部声明的 T 会被擦除，
+     * 必须显式传入值类型，Gson 才能按该类型构建 Map value。
+     *
+     * @param gsonString JSON 数组字符串
+     * @param valueClass Map 值类型，必填
+     * @return 值类型为 valueClass 的 List
+     */
+    public static <T> List<Map<String, T>> strToListMaps(String gsonString, Class<T> valueClass) {
+        Type mapType = TypeToken.getParameterized(Map.class, String.class, valueClass).getType();
+        return GSON.fromJson(gsonString, TypeToken.getParameterized(List.class, mapType).getType());
     }
 
     /**
@@ -131,10 +149,24 @@ public class GsonTool {
      *
      * @param gsonString
      * @return
+     * @deprecated 泛型 T 无法在运行期保留，Gson 不能根据调用处声明确定值类型。
+     * 请改用 {@link #strToMaps(String, Class)}，显式指定 Map 值类型。
      */
+    @Deprecated
     public static <T> Map<String, T> strToMaps(String gsonString) {
         return GSON.fromJson(gsonString, new TypeToken<Map<String, T>>() {
         }.getType());
+    }
+
+    /**
+     * 将 JSON 对象转换为 Map<String, valueClass>。
+     *
+     * @param gsonString JSON 对象字符串
+     * @param valueClass Map 值类型，必填
+     * @return 值类型为 valueClass 的 Map
+     */
+    public static <T> Map<String, T> strToMaps(String gsonString, Class<T> valueClass) {
+        return GSON.fromJson(gsonString, TypeToken.getParameterized(Map.class, String.class, valueClass).getType());
     }
 
     /**
