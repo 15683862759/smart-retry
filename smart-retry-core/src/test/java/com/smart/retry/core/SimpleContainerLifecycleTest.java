@@ -17,6 +17,7 @@ import java.lang.reflect.Proxy;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -78,6 +79,33 @@ public class SimpleContainerLifecycleTest {
 
             Assertions.assertEquals(0, taskAccess.listRetryTaskCount,
                     "消费者注册完成前，Producer 不应扫描数据库");
+        } finally {
+            container.destroy();
+        }
+    }
+
+    @Test
+    void producerBacksOffAfterDatabaseScanFailure() throws Exception {
+        AtomicInteger failureCount = new AtomicInteger();
+        RetryTaskAccess taskAccess = failingTaskAccess(failureCount);
+        SmartExecutorConfigure configure = new SmartExecutorConfigure();
+        configure.setTaskFindInterval(1);
+        SimpleContainer container =
+                new SimpleContainer(new TestConfiguration(taskAccess), configure);
+
+        container.start();
+        try {
+            SmartRetryRunFlag.setFlag(true);
+            long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(2);
+            while (failureCount.get() == 0 && System.currentTimeMillis() < deadline) {
+                TimeUnit.MILLISECONDS.sleep(20);
+            }
+            Assertions.assertEquals(1, failureCount.get(),
+                    "首次数据库扫描失败后应进入一个扫描周期的退避等待");
+
+            TimeUnit.MILLISECONDS.sleep(200);
+            Assertions.assertEquals(1, failureCount.get(),
+                    "扫描失败后不应立即重试，避免数据库故障期间忙轮询");
         } finally {
             container.destroy();
         }
@@ -160,6 +188,22 @@ public class SimpleContainerLifecycleTest {
                         return Collections.emptyList();
                     }
                     throw new UnsupportedOperationException(method.getName());
+                });
+    }
+
+    private static RetryTaskAccess failingTaskAccess(AtomicInteger failureCount) {
+        return (RetryTaskAccess) Proxy.newProxyInstance(
+                RetryTaskAccess.class.getClassLoader(),
+                new Class<?>[]{RetryTaskAccess.class},
+                (proxy, method, args) -> {
+                    if ("listRetryTask".equals(method.getName())) {
+                        failureCount.incrementAndGet();
+                        throw new IllegalStateException("database unavailable");
+                    }
+                    if ("listDeadTask".equals(method.getName())) {
+                        return Collections.emptyList();
+                    }
+                    return null;
                 });
     }
 

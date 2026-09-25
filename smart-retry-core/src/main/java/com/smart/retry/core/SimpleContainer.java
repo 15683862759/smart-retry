@@ -756,6 +756,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                     sleepOneInterval();
                 } catch (Exception e) {
                     LOGGER.error("[ProducerTask#run] producer task exception errMsg,{}", e.getMessage(), e);
+                    sleepOneInterval();
                 }
             }
         }
