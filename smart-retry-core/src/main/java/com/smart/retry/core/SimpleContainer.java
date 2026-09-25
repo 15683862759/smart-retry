@@ -198,8 +198,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
     @Override
     public void destroy() {
+        boolean wasRunning;
         synchronized (this) {
-            boolean wasRunning = containerRunning;
+            wasRunning = containerRunning;
             if (wasRunning) {
                 containerRunning = false;
 
@@ -220,8 +221,6 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                 }
 
                 delayQueue.clear();
-                RetryCache.clear();
-                RetryTaskCache.clear();
 
                 schedulerThread = null;
                 producerThread = null;
@@ -231,8 +230,15 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                 taskScheduler = null;
             }
         }
-        CONTAINERS.remove(retryConfiguration, this);
-        SmartRetryRunFlag.setFlag(hasRunningContainer());
+        synchronized (SimpleContainer.class) {
+            CONTAINERS.remove(retryConfiguration, this);
+            boolean hasOtherContainer = !CONTAINERS.isEmpty();
+            if (wasRunning && !hasOtherContainer) {
+                RetryCache.clear();
+                RetryTaskCache.clear();
+            }
+            SmartRetryRunFlag.setFlag(hasRunningContainer());
+        }
     }
 
     private static boolean hasRunningContainer() {

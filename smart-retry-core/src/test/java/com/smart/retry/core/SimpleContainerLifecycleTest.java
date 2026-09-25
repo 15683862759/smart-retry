@@ -5,7 +5,9 @@ import com.smart.retry.common.RetryTaskAccess;
 import com.smart.retry.common.SmartRetryRunFlag;
 import com.smart.retry.common.identifier.Identifier;
 import com.smart.retry.common.model.RetryTask;
+import com.smart.retry.common.model.RetryTaskObject;
 import com.smart.retry.common.serializer.SmartSerializer;
+import com.smart.retry.core.cache.RetryCache;
 import com.smart.retry.core.config.SmartExecutorConfigure;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -22,6 +24,8 @@ public class SimpleContainerLifecycleTest {
     @AfterEach
     void tearDown() {
         SmartRetryRunFlag.setFlag(false);
+        RetryCache.clear();
+        RetryTaskCache.clear();
     }
 
     @Test
@@ -68,6 +72,41 @@ public class SimpleContainerLifecycleTest {
         Assertions.assertThrows(IllegalStateException.class,
                 () -> SimpleContainer.getContainer(configuration),
                 "未启动容器销毁后也应从配置绑定表中移除");
+    }
+
+    @Test
+    void destroyOneContainerKeepsGlobalCachesForRunningContainer() {
+        String taskCode = "surviving-container-task";
+        String taskKey = taskCode + "-task";
+        RetryTaskAccess taskAccess = emptyTaskAccess();
+        SmartExecutorConfigure configure = new SmartExecutorConfigure();
+        configure.setTaskFindInterval(1);
+
+        TestConfiguration firstConfiguration = new TestConfiguration(taskAccess);
+        TestConfiguration secondConfiguration = new TestConfiguration(taskAccess);
+        SimpleContainer first = new SimpleContainer(firstConfiguration, configure);
+        SimpleContainer second = new SimpleContainer(secondConfiguration, configure);
+        first.start();
+        second.start();
+        RetryCache.put(taskCode, RetryTaskObject.of().withTaskCode(taskCode));
+        Assertions.assertTrue(RetryTaskCache.tryMark(taskKey));
+
+        try {
+            first.destroy();
+
+            Assertions.assertSame(second, SimpleContainer.getContainer(secondConfiguration),
+                    "另一个容器仍应保持绑定");
+            Assertions.assertNotNull(RetryCache.get(taskCode),
+                    "销毁一个容器不应清空仍运行容器的任务定义");
+            Assertions.assertEquals(1, RetryTaskCache.size(),
+                    "销毁一个容器不应清空仍运行容器的内存任务标记");
+        } finally {
+            first.destroy();
+            second.destroy();
+        }
+
+        Assertions.assertNull(RetryCache.get(taskCode), "最后一个容器销毁后才应清空任务定义");
+        Assertions.assertEquals(0, RetryTaskCache.size(), "最后一个容器销毁后才应清空内存任务标记");
     }
 
     private static RetryTaskAccess emptyTaskAccess() {

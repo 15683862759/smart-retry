@@ -25,6 +25,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class RemoteRetryerTest {
 
+    private SimpleContainer container;
+
     @BeforeEach
     void setUp() {
         ShardingContextHolder.initShardingIndex(Collections.singletonList(0L));
@@ -32,6 +34,10 @@ public class RemoteRetryerTest {
 
     @AfterEach
     void tearDown() {
+        if (container != null) {
+            container.destroy();
+            container = null;
+        }
         ShardingContextHolder.initShardingIndex(Collections.emptyList());
     }
 
@@ -39,7 +45,7 @@ public class RemoteRetryerTest {
     void testRegisterTaskDoesNotOverflowLargeFirstDelaySecond() throws Throwable {
         final AtomicReference<RetryTask> savedTask = new AtomicReference<>();
         RetryConfiguration configuration = new TestConfiguration(taskAccessProxy(savedTask));
-        new SimpleContainer(configuration, new SmartExecutorConfigure());
+        container = new SimpleContainer(configuration, new SmartExecutorConfigure());
 
         Method method = getClass().getDeclaredMethod("retryTarget");
         RetryOnMethod retryable = method.getAnnotation(RetryOnMethod.class);
