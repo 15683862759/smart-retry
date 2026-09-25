@@ -80,7 +80,7 @@ public class RemoteRetryer implements IRetryer {
         retryTask.setNextPlanTimeStrategy(retryable.nextPlanTimeStragy().getCode());
         retryTask.setIntervalSecond(retryable.intervalSecond());
 
-        long firstNextExecuteTime = System.currentTimeMillis()+retryable.firstDelaySecond()*1000;
+        long firstNextExecuteTime = System.currentTimeMillis()+retryable.firstDelaySecond()*1000L;
         retryTask.setNextPlanTime(new Date(firstNextExecuteTime));
 
         // 把当前线程命中的 MDC traceId key + value 一起编码落到 current_log_id，
