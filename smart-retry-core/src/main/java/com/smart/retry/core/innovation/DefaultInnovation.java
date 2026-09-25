@@ -30,6 +30,10 @@ import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @Author xiaoqiang
@@ -41,16 +45,38 @@ public class DefaultInnovation implements SmartInnovation {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultInnovation.class);
 
+    /**
+     * 所有执行方共享一个守护调度线程即可：续期 SQL 非常轻量，
+     * 且任务结束时会主动 cancel，避免为每个任务创建额外线程。
+     */
+    private static final ScheduledExecutorService LEASE_HEARTBEAT_EXECUTOR =
+            Executors.newSingleThreadScheduledExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "smart-retry-lease-heartbeat");
+                thread.setDaemon(true);
+                return thread;
+            });
+
     private RetryTask retryTask;
 
     private RetryConfiguration retryConfiguration;
+
+    private final long leaseRenewalSeconds;
 
 
     private static final Map<Class<? extends RetryTaskNotify>, RetryTaskNotify> retryTaskNotifyMap = new ConcurrentHashMap<>();
 
     public DefaultInnovation(RetryTask retryTask, RetryConfiguration retryConfiguration) {
+        this(retryTask, retryConfiguration, 60L);
+    }
+
+    public DefaultInnovation(RetryTask retryTask, RetryConfiguration retryConfiguration,
+                             long leaseRenewalSeconds) {
         this.retryTask = retryTask;
         this.retryConfiguration = retryConfiguration;
+        if (leaseRenewalSeconds < 1) {
+            throw new IllegalArgumentException("leaseRenewalSeconds must be greater than 0");
+        }
+        this.leaseRenewalSeconds = leaseRenewalSeconds;
     }
 
 
@@ -119,6 +145,10 @@ public class DefaultInnovation implements SmartInnovation {
         // 避免败者把胜者的 RUNNING 覆盖成 FAIL，导致业务被重复执行。
         beforeProcessTask(retryTask);
 
+        // 认领成功后立即开启执行租约心跳。长任务执行期间持续刷新 gmt_modified，
+        // 死信线程便不会把仍在运行的业务误判为超时并复活给其他执行方。
+        ScheduledFuture<?> leaseHeartbeat = startExecutionLeaseHeartbeat();
+
         Method method = taskObject.getMethod();
 
         Throwable throwable = null;
@@ -149,6 +179,7 @@ public class DefaultInnovation implements SmartInnovation {
             notifyContext.setThrowable(ex);
             throw ex;
         } finally {
+            cancelExecutionLeaseHeartbeat(leaseHeartbeat);
             String exceptionMsg = ExceptionUtils.createConciseStackTraceMessage(throwable);
             if (exceptionMsg != null) {
                 retryTask.setAttribute(exceptionMsg);
@@ -207,6 +238,48 @@ public class DefaultInnovation implements SmartInnovation {
         if (updated != 1) {
             LOGGER.warn("[DefaultInnovation#processNullTaskObject] mark fail skipped, "
                     + "task may be claimed/revived, taskId:{}", retryTask.getId());
+        }
+    }
+
+    /**
+     * 启动执行租约心跳。
+     *
+     * <p>实现过程：
+     * 1. 以认领时生成的 executor 作为数据库 CAS 守卫；
+     * 2. 周期性刷新 RUNNING 任务的 gmt_modified；
+     * 3. 若调度器已关闭，仅记录日志并继续执行业务，终态 CAS 仍能兜底防止覆盖。
+     *
+     * @return 心跳任务；调度不可用时返回 null
+     */
+    private ScheduledFuture<?> startExecutionLeaseHeartbeat() {
+        try {
+            return LEASE_HEARTBEAT_EXECUTOR.scheduleAtFixedRate(this::renewExecutionLease,
+                    leaseRenewalSeconds, leaseRenewalSeconds, TimeUnit.SECONDS);
+        } catch (Exception ex) {
+            LOGGER.warn("[DefaultInnovation#startExecutionLeaseHeartbeat] start failed, taskId:{}",
+                    retryTask.getId(), ex);
+            return null;
+        }
+    }
+
+    private void renewExecutionLease() {
+        try {
+            int renewed = retryConfiguration.getRetryTaskAcess()
+                    .renewExecutionLease(retryTask.getId(), retryTask.getExecutor());
+            if (renewed != 1) {
+                LOGGER.warn("[DefaultInnovation#renewExecutionLease] lease skipped, "
+                                + "task may be terminal or revived, taskId:{}, executor:{}",
+                        retryTask.getId(), retryTask.getExecutor());
+            }
+        } catch (Exception ex) {
+            LOGGER.warn("[DefaultInnovation#renewExecutionLease] renew error, taskId:{}",
+                    retryTask.getId(), ex);
+        }
+    }
+
+    private void cancelExecutionLeaseHeartbeat(ScheduledFuture<?> leaseHeartbeat) {
+        if (leaseHeartbeat != null) {
+            leaseHeartbeat.cancel(false);
         }
     }
 

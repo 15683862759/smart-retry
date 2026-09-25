@@ -67,6 +67,15 @@ public interface RetryTaskRepo {
     int markNullTaskObjectFail(RetryTaskDO retryTask);
 
     /**
+     * 续期执行租约。
+     *
+     * @param id       任务 ID
+     * @param executor 当前执行租约
+     * @return 受影响行数：1=续约成功，0=任务已终态或租约失效
+     */
+    int renewExecutionLease(Long id, String executor);
+
+    /**
      * 条件化复活死信任务（乐观锁 CAS 守卫）。
      *
      * <p>单条原子 UPDATE，禁止先查后改。守卫：status = 1 且 gmt_modified < deadTaskTime。

@@ -311,7 +311,7 @@
     <update id="markNullTaskObjectFail" parameterType="com.smart.retry.mybatis.entity.RetryTaskDO">
         update retry_task
         set status = 3,
-            retry_num = retry_num - 1,
+            retry_num = CASE WHEN retry_num > 0 THEN retry_num - 1 ELSE retry_num END,
             executor = #{executor,jdbcType=VARCHAR},
             <if test="nextPlanTime != null">
                 next_plan_time = #{nextPlanTime,jdbcType=TIMESTAMP},
@@ -324,6 +324,16 @@
           and status in (0, 3)
           and retry_num &gt;= 1
           and retry_num = #{retryNum}
+    </update>
+
+    <!-- 执行租约续期：仅 RUNNING 且仍由当前 executor 持有时刷新心跳时间。
+         长业务执行期间持续续约，避免死信线程把存活任务误判为超时并复活。 -->
+    <update id="renewTask">
+        update retry_task
+        set gmt_modified = SYSDATE
+        where id = #{id,jdbcType=BIGINT}
+          and status = 1
+          and executor = #{executor,jdbcType=VARCHAR}
     </update>
 
     <!-- 条件化复活死信任务（乐观锁 CAS 守卫）。 -->

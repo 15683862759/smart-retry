@@ -7,9 +7,9 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 smart-retry 是一个基于 Spring AOP 的轻量级重试框架，将重试任务与业务事务绑定，通过数据库持久化保证最终一致性。支持多实例自动接管、死信检测、历史清理等功能。
 
 - **GroupId**: `com.smart.retry`
-- **版本**: `${smart.retry.version}` (当前 1.0.1)
-- **Java**: 17
-- **Spring Boot**: 3.3.5
+- **版本**: `${smart.retry.version}` (当前 1.0.2)
+- **Java**: 8
+- **Spring Boot**: 2.7.18
 - **持久层**: MyBatis（支持 MySQL、PostgreSQL、Oracle）
 
 ## 常用命令

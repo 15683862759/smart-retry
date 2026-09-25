@@ -63,6 +63,15 @@ public interface RetryTaskDao {
     int markNullTaskObjectFail(RetryTaskDO retryTaskDO);
 
     /**
+     * 续期执行租约。守卫：status = RUNNING 且 executor 匹配。
+     *
+     * @param id       任务 ID
+     * @param executor 当前执行租约
+     * @return 受影响行数：1=续约成功，0=任务已终态或租约失效
+     */
+    int renewTask(@Param("id") Long id, @Param("executor") String executor);
+
+    /**
      * 条件化复活死信任务（乐观锁 CAS 守卫）。
      * 守卫：status = 1 且 gmt_modified < #{deadTaskTime}。
      *

@@ -137,7 +137,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
      * 启动调度容器。
      *
      * <p>实现过程：
-     * 1. 标记全局运行状态，确保扫描器开始注册任务；
+     * 1. 启动调度线程，但等待扫描器完成注册后才拉取任务；
      * 2. 初始化消费线程池和预加载窗口；
      * 3. 启动 Producer 兜底扫描和 DelayQueue 调度线程；
      * 4. 按配置启动死信检测与历史清理任务。
@@ -148,7 +148,6 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             if (containerRunning) {
                 return;
             }
-            SmartRetryRunFlag.setFlag(true);
             initTaskExecutor(smartConfigure);
 
             // 初始化预加载窗口
@@ -192,6 +191,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
         int corePoolSize = smartConfigure.getExecutor().getCorePoolSize();
         int maxPoolSize = smartConfigure.getExecutor().getMaxPoolSize();
+        long keepAliveSeconds = smartConfigure.getExecutor().getKeepAliveSeconds();
         int queueSize = smartConfigure.getMaxInMemory();
         String name = smartConfigure.getExecutor().getName();
         consumerQueue = new ArrayBlockingQueue<>(queueSize+100);
@@ -199,7 +199,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
 
         consumerExecutor = new ThreadPoolExecutor(corePoolSize,
                 maxPoolSize,
-                1L, TimeUnit.SECONDS,
+                keepAliveSeconds, TimeUnit.SECONDS,
                 consumerQueue,
                 new ThreadFactory() {
                     @Override
@@ -209,6 +209,20 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                 },
                 //采用拒绝策略为callerRunsPolicy，即当线程池队列满时，直接在调用者线程中运行被拒绝的任务
                 new ThreadPoolExecutor.CallerRunsPolicy());
+    }
+
+    /**
+     * 计算执行租约续期间隔。
+     *
+     * <p>取死信超时时间的 1/3，并限制在 1 到 60 秒之间：
+     * 下限保证极短超时配置下心跳仍先于死信扫描生效，
+     * 上限避免长任务配置带来过高数据库心跳压力。
+     *
+     * @return 续期间隔，单位秒
+     */
+    private long getLeaseRenewalSeconds() {
+        int maxExecuteTimeout = smartConfigure.getDeadTask().getTaskMaxExecuteTimeout();
+        return Math.max(1L, Math.min(60L, maxExecuteTimeout / 3L));
     }
 
     /**
@@ -273,7 +287,10 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                 RetryCache.clear();
                 RetryTaskCache.clear();
             }
-            SmartRetryRunFlag.setFlag(hasRunningContainer());
+            // SmartRetryRunFlag 表示"任务定义已注册且容器可调度"。
+            // 销毁一个容器时不能把未完成扫描的全局开关打开，因此只在当前开关已打开
+            // 且仍有其他容器运行时保持 true。
+            SmartRetryRunFlag.setFlag(hasRunningContainer() && SmartRetryRunFlag.getFlag());
         }
     }
 
@@ -693,6 +710,10 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
                     sleepOneInterval();
                     continue;
                 }
+                if (!SmartRetryRunFlag.getFlag()) {
+                    sleepOneInterval();
+                    continue;
+                }
 
                 try {
                     int currentSize = RetryTaskCache.size();
@@ -887,7 +908,8 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             // 2. 反射调用：捕获业务返回值；异常时业务结果置 null
             Object businessResult = null;
             try {
-                businessResult = new DefaultInnovation(retryTask, retryConfiguration).invoke();
+                businessResult = new DefaultInnovation(retryTask, retryConfiguration,
+                        getLeaseRenewalSeconds()).invoke();
             } catch (RetryTaskClaimedException e) {
                 // 认领竞争失败：任务已由其他执行方接管（同 JVM 残留 delayQueue/手动触发，
                 // 或跨实例的 Producer），本实例不执行业务。

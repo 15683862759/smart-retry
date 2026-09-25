@@ -122,6 +122,21 @@ public interface RetryTaskAccess {
     }
 
     /**
+     * 续期执行租约。
+     *
+     * <p>仅当任务仍为 RUNNING(1) 且数据库 executor 与当前执行方一致时，
+     * 刷新 {@code gmt_modified} 作为执行心跳。默认返回 0 保持旧实现兼容；
+     * 支持死信检测的持久化实现应覆盖本方法。
+     *
+     * @param id       任务 ID
+     * @param executor 当前执行租约
+     * @return 1=续约成功，0=任务已终态、已被复活或租约已失效
+     */
+    default int renewExecutionLease(Long id, String executor) {
+        return 0;
+    }
+
+    /**
      * 条件化复活死信任务（乐观锁 CAS 守卫）。
      *
      * <p>仅当任务仍为 RUNNING(1) 且 {@code gmt_modified < deadTaskTime}（确认超时）时，

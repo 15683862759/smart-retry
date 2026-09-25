@@ -5,8 +5,9 @@ import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.dto.dashboard.DashboardVO;
 import com.smart.retry.web.dto.dashboard.DeadLetterTrendVO;
 import com.smart.retry.web.dto.dashboard.InstanceHeartbeatVO;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.text.SimpleDateFormat;
@@ -22,11 +23,39 @@ import java.util.*;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RetryDashboardService {
-    
+
     private final WebRetryShardingDao webRetryShardingDao;
     private final WebRetryTaskDao webRetryTaskDao;
+    private final int activeInstanceTimeoutSeconds;
+
+    /**
+     * 创建生产环境使用的仪表盘服务。
+     *
+     * @param webRetryShardingDao          分片DAO 必填
+     * @param webRetryTaskDao              任务DAO 必填
+     * @param activeInstanceTimeoutSeconds 活跃实例心跳超时时间，单位秒；
+     *                                      默认取框架健康检查超时时间 240 秒
+     */
+    @Autowired
+    public RetryDashboardService(WebRetryShardingDao webRetryShardingDao,
+                                 WebRetryTaskDao webRetryTaskDao,
+                                 @Value("${spring.smart-retry.health.timeout:240}") int activeInstanceTimeoutSeconds) {
+        this.webRetryShardingDao = webRetryShardingDao;
+        this.webRetryTaskDao = webRetryTaskDao;
+        this.activeInstanceTimeoutSeconds = activeInstanceTimeoutSeconds;
+    }
+
+    /**
+     * 创建使用框架默认健康检查超时时间的仪表盘服务，便于单元测试和普通实例化场景复用。
+     *
+     * @param webRetryShardingDao 分片DAO 必填
+     * @param webRetryTaskDao     任务DAO 必填
+     */
+    public RetryDashboardService(WebRetryShardingDao webRetryShardingDao,
+                                 WebRetryTaskDao webRetryTaskDao) {
+        this(webRetryShardingDao, webRetryTaskDao, 240);
+    }
     
     /**
      * 获取仪表盘监控数据。
@@ -41,8 +70,8 @@ public class RetryDashboardService {
     public DashboardVO getDashboardData() {
         DashboardVO dashboard = new DashboardVO();
         
-        // 1. 活跃实例数量
-        dashboard.setActiveInstanceCount(webRetryShardingDao.countActiveInstances(10));
+        // 1. 活跃实例数量；统计窗口必须与实例死亡判定配置保持一致，避免短时间心跳抖动被误判为下线
+        dashboard.setActiveInstanceCount(webRetryShardingDao.countActiveInstances(activeInstanceTimeoutSeconds));
         
         // 2. 分片分布情况
         List<Map<String, Object>> shardingDist = webRetryShardingDao.getShardingDistribution();

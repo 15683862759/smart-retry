@@ -18,6 +18,7 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public class SimpleContainerLifecycleTest {
 
@@ -42,6 +43,8 @@ public class SimpleContainerLifecycleTest {
         first.start();
         second.start();
         try {
+            // 模拟 ApplicationReadyEvent 后扫描完成；启动窗口内全局开关必须保持关闭。
+            SmartRetryRunFlag.setFlag(true);
             first.destroy();
 
             Assertions.assertThrows(IllegalStateException.class,
@@ -60,6 +63,45 @@ public class SimpleContainerLifecycleTest {
         Assertions.assertFalse(SmartRetryRunFlag.getFlag());
         Assertions.assertTrue(awaitProducerThreadCount(0, 2),
                 "全部容器销毁后不应残留生产者线程");
+    }
+
+    @Test
+    void producerWaitsUntilRetryDefinitionsAreRegistered() throws Exception {
+        CountingTaskAccess taskAccess = new CountingTaskAccess();
+        SmartExecutorConfigure configure = new SmartExecutorConfigure();
+        configure.setTaskFindInterval(1);
+        SimpleContainer container = new SimpleContainer(new TestConfiguration(taskAccess), configure);
+
+        container.start();
+        try {
+            TimeUnit.MILLISECONDS.sleep(200);
+
+            Assertions.assertEquals(0, taskAccess.listRetryTaskCount,
+                    "消费者注册完成前，Producer 不应扫描数据库");
+        } finally {
+            container.destroy();
+        }
+    }
+
+    @Test
+    void taskExecutorUsesConfiguredKeepAliveSeconds() throws Exception {
+        SmartExecutorConfigure configure = new SmartExecutorConfigure();
+        configure.setTaskFindInterval(1);
+        configure.getExecutor().setKeepAliveSeconds(17);
+        SimpleContainer container =
+                new SimpleContainer(new TestConfiguration(emptyTaskAccess()), configure);
+
+        container.start();
+        try {
+            java.lang.reflect.Field field = SimpleContainer.class.getDeclaredField("consumerExecutor");
+            field.setAccessible(true);
+            ThreadPoolExecutor executor = (ThreadPoolExecutor) field.get(container);
+
+            Assertions.assertEquals(17, executor.getKeepAliveTime(TimeUnit.SECONDS),
+                    "keepAliveSeconds 配置必须传给消费线程池");
+        } finally {
+            container.destroy();
+        }
     }
 
     @Test
@@ -119,6 +161,75 @@ public class SimpleContainerLifecycleTest {
                     }
                     throw new UnsupportedOperationException(method.getName());
                 });
+    }
+
+    private static class CountingTaskAccess implements RetryTaskAccess {
+        private volatile int listRetryTaskCount;
+
+        @Override
+        public List<com.smart.retry.common.model.RetryTask> listDeadTask(int maxExecuteTime) {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<com.smart.retry.common.model.RetryTask> listRetryTask(java.util.Date maxNextPlanTime, int limit) {
+            listRetryTaskCount++;
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<com.smart.retry.common.model.RetryTask> listRetryTask() {
+            listRetryTaskCount++;
+            return Collections.emptyList();
+        }
+
+        @Override
+        public com.smart.retry.common.model.RetryTask getRetryTask(long taskId) {
+            return null;
+        }
+
+        @Override
+        public long saveRetryTask(com.smart.retry.common.model.RetryTask retryTask) {
+            return 0;
+        }
+
+        @Override
+        public void updateRetryTask(com.smart.retry.common.model.RetryTask retryTask) {
+        }
+
+        @Override
+        public int claimRetryTask(Long id, String executor, java.util.Date nextPlanTime, Long shardingKey) {
+            return 0;
+        }
+
+        @Override
+        public int markRetryTaskTerminal(Long id, int status, String executor, int retryNum,
+                                         java.util.Date nextPlanTime, String attribute) {
+            return 0;
+        }
+
+        @Override
+        public int markNullTaskObjectFail(Long id, String executor, int retryNum, String attribute) {
+            return 0;
+        }
+
+        @Override
+        public int reviveDeadRetryTask(Long id, java.util.Date deadTaskTime) {
+            return 0;
+        }
+
+        @Override
+        public void deleteRetryTask(long taskId) {
+        }
+
+        @Override
+        public void stopRetryTask(long taskId) {
+        }
+
+        @Override
+        public int deleteHistoryRetryTask(int clearBeforeDays, int limitRows) {
+            return 0;
+        }
     }
 
     private static boolean awaitProducerThreadCount(int expected, int timeoutSeconds)

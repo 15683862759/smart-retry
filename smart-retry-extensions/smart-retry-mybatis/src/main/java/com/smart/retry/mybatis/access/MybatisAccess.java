@@ -203,6 +203,12 @@ public class MybatisAccess implements RetryTaskAccess {
     }
 
     @Override
+    public int renewExecutionLease(Long id, String executor) {
+        // 委托 Repo 执行带租约守卫的原子心跳续期。
+        return retryTaskRepo.renewExecutionLease(id, executor);
+    }
+
+    @Override
     public int reviveDeadRetryTask(Long id, Date deadTaskTime) {
         // 单条原子 UPDATE（乐观锁 CAS 守卫）：仅复活 RUNNING 且确认超时的任务
         return retryTaskRepo.reviveDeadRetryTask(id, deadTaskTime);

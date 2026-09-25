@@ -1,5 +1,7 @@
 package com.smart.retry.core.config;
 
+import javax.annotation.PostConstruct;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -284,6 +286,23 @@ public class SmartExecutorConfigure {
         this.executor = executor;
     }
 
+    /**
+     * 属性绑定完成后统一校验跨字段约束。
+     *
+     * <p>corePoolSize 与 maxPoolSize 的绑定顺序由 Spring 决定，setter 内互相校验
+     * 会把最终合法的中间态误判为非法配置；因此 setter 只校验自身取值，
+     * 这里再统一校验 maxPoolSize >= corePoolSize。
+     */
+    @PostConstruct
+    public void validate() {
+        if (executor.getCorePoolSize() < 1) {
+            throw new IllegalArgumentException("corePoolSize must be greater than 0");
+        }
+        if (executor.getMaxPoolSize() < executor.getCorePoolSize()) {
+            throw new IllegalArgumentException("maxPoolSize must be greater than or equal to corePoolSize");
+        }
+    }
+
     public static class Executor {
         private String name = "smart-retry-executor";
         private int corePoolSize = Runtime.getRuntime().availableProcessors() + 1;
@@ -306,9 +325,6 @@ public class SmartExecutorConfigure {
             if (corePoolSize < 1) {
                 throw new IllegalArgumentException("corePoolSize must be greater than 0");
             }
-            if (maxPoolSize < corePoolSize) {
-                throw new IllegalArgumentException("maxPoolSize must be greater than corePoolSize");
-            }
             this.corePoolSize = corePoolSize;
         }
 
@@ -318,9 +334,6 @@ public class SmartExecutorConfigure {
         }
 
         public void setMaxPoolSize(int maxPoolSize) {
-            if (maxPoolSize < corePoolSize) {
-                throw new IllegalArgumentException("maxPoolSize must be greater than corePoolSize");
-            }
             this.maxPoolSize = maxPoolSize;
         }
 

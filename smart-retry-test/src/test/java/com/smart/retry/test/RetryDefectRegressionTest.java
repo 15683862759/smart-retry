@@ -211,6 +211,64 @@ public class RetryDefectRegressionTest extends AbstractTest {
     }
 
     @Test
+    public void testUnknownTaskCodeWithZeroRetryNumStillWritesFailState() {
+        String uniqueKey = "unknown-task-zero-retry-" + System.nanoTime();
+        jdbcTemplate.update(
+                "INSERT INTO retry_task(gmt_create, gmt_modified, sharding_key, task_code, status, " +
+                        "retry_num, origin_retry_num, next_plan_time, interval_second, " +
+                        "next_plan_time_strategy, unique_key) " +
+                        "VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, 0, 0, 0, " +
+                        "CURRENT_TIMESTAMP, 60, 1, ?)",
+                ShardingContextHolder.getRandomShardingIndex(),
+                "unknown-task-code-zero-" + System.nanoTime(), uniqueKey);
+        Long taskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM retry_task WHERE unique_key = ?", Long.class, uniqueKey);
+        try {
+            int updated = retryTaskAccess.markNullTaskObjectFail(
+                    taskId, "zero-retry-lease", 0, new java.util.Date(), "taskObject is null");
+
+            Assert.assertEquals("retry_num 为 0 时也必须能写入 FAIL 终态", 1, updated);
+            Integer status = jdbcTemplate.queryForObject(
+                    "SELECT status FROM retry_task WHERE id = ?", Integer.class, taskId);
+            Integer retryNum = jdbcTemplate.queryForObject(
+                    "SELECT retry_num FROM retry_task WHERE id = ?", Integer.class, taskId);
+            Assert.assertEquals(Integer.valueOf(RetryTaskStatus.FAIL.getCode()), status);
+            Assert.assertEquals("耗尽后的剩余次数不能变成负数", Integer.valueOf(0), retryNum);
+        } finally {
+            jdbcTemplate.update("DELETE FROM retry_task WHERE unique_key = ?", uniqueKey);
+        }
+    }
+
+    @Test
+    public void testExecutionLeaseRenewalPreventsLiveTaskFromBeingMarkedDead() {
+        String uniqueKey = "execution-lease-renew-" + System.nanoTime();
+        String lease = "live-execution-lease";
+        jdbcTemplate.update(
+                "INSERT INTO retry_task(gmt_create, gmt_modified, sharding_key, task_code, status, " +
+                        "retry_num, origin_retry_num, next_plan_time, interval_second, " +
+                        "next_plan_time_strategy, unique_key, executor) " +
+                        "VALUES (CURRENT_TIMESTAMP, DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 100 SECOND), " +
+                        "?, ?, 1, 0, 1, CURRENT_TIMESTAMP, 60, 1, ?, ?)",
+                ShardingContextHolder.getRandomShardingIndex(),
+                "execution-lease-" + System.nanoTime(), uniqueKey, lease);
+        Long taskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM retry_task WHERE unique_key = ?", Long.class, uniqueKey);
+        try {
+            int renewed = retryTaskAccess.renewExecutionLease(taskId, lease);
+
+            Assert.assertEquals("持有执行租约的 RUNNING 任务必须能续约", 1, renewed);
+            java.util.Date gmtModified = jdbcTemplate.queryForObject(
+                    "SELECT gmt_modified FROM retry_task WHERE id = ?", java.util.Date.class, taskId);
+            Assert.assertTrue("续约后 gmt_modified 必须回到当前时间附近",
+                    System.currentTimeMillis() - gmtModified.getTime() < 10_000L);
+            Assert.assertEquals("旧租约不允许续约", 0,
+                    retryTaskAccess.renewExecutionLease(taskId, "expired-execution-lease"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM retry_task WHERE unique_key = ?", uniqueKey);
+        }
+    }
+
+    @Test
     public void testCreateTaskRejectsMissingNextPlanTimeStrategyWithFriendlyError() {
         RetryTaskBuilder<TestParam> builder = RetryTaskBuilder.<TestParam>of()
                 .withTaskCode(TASK_CODE)

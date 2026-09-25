@@ -117,6 +117,12 @@ public class RetryTaskRepoImpl implements RetryTaskRepo {
     }
 
     @Override
+    public int renewExecutionLease(Long id, String executor) {
+        // 单条原子 UPDATE：只刷新匹配执行租约的 RUNNING 任务心跳。
+        return retryTaskDao.renewTask(id, executor);
+    }
+
+    @Override
     public int reviveDeadRetryTask(Long id, Date deadTaskTime) {
         // 关键：单条原子 UPDATE 直接透传，禁止先查后改，
         // 守卫 status = 1 + gmt_modified，防止复活已终态任务或覆盖刚写入的终态。

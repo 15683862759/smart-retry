@@ -81,4 +81,33 @@ public class SmartExecutorConfigureTest {
 
         Assertions.assertEquals(1, executor.getKeepAliveSeconds());
     }
+
+    @Test
+    void executorPoolSizesAreValidatedAfterPropertiesAreBound() {
+        SmartExecutorConfigure configuration = new SmartExecutorConfigure();
+        SmartExecutorConfigure.Executor executor = configuration.getExecutor();
+
+        executor.setMaxPoolSize(100);
+        executor.setCorePoolSize(50);
+        executor.setMaxPoolSize(2);
+        executor.setCorePoolSize(1);
+
+        Assertions.assertDoesNotThrow(configuration::validate,
+                "属性绑定中间态不应拒绝最终合法的线程池配置");
+        Assertions.assertEquals(1, executor.getCorePoolSize());
+        Assertions.assertEquals(2, executor.getMaxPoolSize());
+    }
+
+    @Test
+    void validateRejectsInvalidExecutorPoolSizesAfterBinding() {
+        SmartExecutorConfigure configuration = new SmartExecutorConfigure();
+        SmartExecutorConfigure.Executor executor = configuration.getExecutor();
+
+        executor.setMaxPoolSize(100);
+        executor.setCorePoolSize(50);
+        executor.setMaxPoolSize(2);
+
+        Assertions.assertThrows(IllegalArgumentException.class, configuration::validate,
+                "绑定完成后必须统一校验 maxPoolSize >= corePoolSize");
+    }
 }
