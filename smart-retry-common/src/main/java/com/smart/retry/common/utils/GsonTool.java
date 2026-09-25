@@ -101,15 +101,18 @@ public class GsonTool {
     }
 
     /**
-     * 转成list
+     * 将 JSON 数组转换为指定元素类型的 List。
      *
-     * @param gsonString
-     * @param cls
-     * @return
+     * <p>不能使用 {@code new TypeToken<List<T>>(){}.getType()}：方法内部泛型 T
+     * 在运行期会被擦除，Gson 实际按 List<Object> 解析。这里把调用方传入的
+     * 元素类型交给 Gson，确保数值、对象等字段按目标类型还原。
+     *
+     * @param gsonString JSON 数组字符串
+     * @param cls        List 元素类型
+     * @return 元素类型为 cls 的 List
      */
     public static <T> List<T> strToList(String gsonString, Class<T> cls) {
-        return GSON.fromJson(gsonString, new TypeToken<List<T>>() {
-        }.getType());
+        return GSON.fromJson(gsonString, TypeToken.getParameterized(List.class, cls).getType());
     }
 
     /**
@@ -174,18 +177,17 @@ public class GsonTool {
     }
 
     /**
-     * json 转成 特定的cls的list
+     * 将 JSON 数组转换为指定元素类型的 List。
      *
-     * @param json
-     * @param classOfT
-     * @return
+     * <p>与 {@link #strToList(String, Class)} 保持同一类型构造规则，
+     * 避免泛型擦除导致调用方在读取元素时发生类型转换异常。
+     *
+     * @param json      JSON 数组字符串
+     * @param classOfT List 元素类型
+     * @return 元素类型为 classOfT 的 List
      */
     public static <T> List<T> fromJsonList(String json, Class<T> classOfT) {
-        return GSON.fromJson(
-                json,
-                new TypeToken<List<T>>() {
-                }.getType()
-        );
+        return GSON.fromJson(json, TypeToken.getParameterized(List.class, classOfT).getType());
     }
 
 
