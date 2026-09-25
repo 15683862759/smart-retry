@@ -21,6 +21,7 @@ import com.smart.retry.web.exception.BusinessException;
 import com.smart.retry.web.exception.GlobalExceptionHandler;
 import com.smart.retry.web.service.RetryTaskService;
 import com.smart.retry.web.service.RetryInstanceService;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -397,6 +398,53 @@ public class RetryDefectRegressionTest extends AbstractTest {
                 "SELECT DATE_FORMAT(next_plan_time, '%Y-%m-%d %H:%i:%s') FROM retry_task WHERE id = ?",
                 String.class, taskId);
         Assert.assertEquals("2025-12-29 12:00:00", nextPlanTime);
+    }
+
+    @Test
+    public void testUpdateTaskParamSyncsUniqueKey() {
+        String originalParam = "{\"value\":\"original-param\"}";
+        String updatedParam = "{\"value\":\"updated-param-" + System.nanoTime() + "\"}";
+        String uniqueKey = "update-param-" + System.nanoTime();
+        jdbcTemplate.update(
+                "INSERT INTO retry_task(gmt_create, gmt_modified, sharding_key, task_code, status, " +
+                        "retry_num, origin_retry_num, next_plan_time, parameters, unique_key) " +
+                        "VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, 0, 1, 1, CURRENT_TIMESTAMP, ?, ?)",
+                ShardingContextHolder.getRandomShardingIndex(), TASK_CODE, originalParam, uniqueKey);
+        Long taskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM retry_task WHERE unique_key = ?", Long.class, uniqueKey);
+
+        TaskUpdateRequest request = new TaskUpdateRequest();
+        request.setId(taskId);
+        request.setParam(updatedParam);
+        retryTaskService.updateTask(request);
+
+        String expectedUniqueKey = DigestUtils.md5Hex(TASK_CODE + ":" + updatedParam);
+        String actualUniqueKey = jdbcTemplate.queryForObject(
+                "SELECT unique_key FROM retry_task WHERE id = ?", String.class, taskId);
+        Assert.assertEquals("更新参数后必须同步重算 unique_key，保持幂等去重语义",
+                expectedUniqueKey, actualUniqueKey);
+    }
+
+    @Test
+    public void testUpdateTaskRetryNumSyncsOriginRetryNum() {
+        String uniqueKey = "update-retry-num-" + System.nanoTime();
+        jdbcTemplate.update(
+                "INSERT INTO retry_task(gmt_create, gmt_modified, sharding_key, task_code, status, " +
+                        "retry_num, origin_retry_num, next_plan_time, parameters, unique_key) " +
+                        "VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, 0, 1, 1, CURRENT_TIMESTAMP, '{}', ?)",
+                ShardingContextHolder.getRandomShardingIndex(), TASK_CODE, uniqueKey);
+        Long taskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM retry_task WHERE unique_key = ?", Long.class, uniqueKey);
+
+        TaskUpdateRequest request = new TaskUpdateRequest();
+        request.setId(taskId);
+        request.setRetryNum(5);
+        retryTaskService.updateTask(request);
+
+        Integer originRetryNum = jdbcTemplate.queryForObject(
+                "SELECT origin_retry_num FROM retry_task WHERE id = ?", Integer.class, taskId);
+        Assert.assertEquals("重设剩余次数后必须同步 origin_retry_num，避免退避序列计算错误",
+                Integer.valueOf(5), originRetryNum);
     }
 
     @Test

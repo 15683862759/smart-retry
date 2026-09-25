@@ -203,12 +203,18 @@ public class RetryTaskService {
         
         if (request.getRetryNum() != null) {
             taskDO.setRetryNum(request.getRetryNum());
+            // 退避、递增、斐波那契策略通过 originRetryNum 计算当前执行轮次。
+            // 人工重设剩余次数时必须同步基准值，否则会继续沿用旧轮次的增长系数。
+            taskDO.setOriginRetryNum(request.getRetryNum());
         }
         
         if (request.getParam() != null) {
             // 校验JSON格式
             validateJson(request.getParam());
             taskDO.setParameters(request.getParam());
+            // unique_key 是按 taskCode + param 派生的幂等键，
+            // 参数变化后同步重算，避免同一新参数再次创建时绕过去重约束。
+            taskDO.setUniqueKey(DigestUtils.md5Hex(taskDO.getTaskCode() + ":" + request.getParam()));
         }
         
         // 处理状态更新：只有失败(3)或成功(2)的任务可以调整为待执行(0)

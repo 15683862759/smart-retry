@@ -76,7 +76,9 @@
             gmt_modified = CURRENT_TIMESTAMP,
             <if test="nextPlanTime != null">next_plan_time = #{nextPlanTime},</if>
             <if test="retryNum != null">retry_num = #{retryNum},</if>
+            <if test="originRetryNum != null">origin_retry_num = #{originRetryNum},</if>
             <if test="parameters != null">parameters = #{parameters},</if>
+            <if test="uniqueKey != null">unique_key = #{uniqueKey},</if>
             <if test="status != null">status = #{status},</if>
         </set>
         WHERE id = #{id}
