@@ -15,19 +15,19 @@ spring:
   # 数据源配置（默认MySQL，可根据需要切换）
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${MYSQL_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:smart_retry}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai}
+    url: ${MYSQL_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:retry_task}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai}
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:root}
     
     # PostgreSQL配置示例
     # driver-class-name: org.postgresql.Driver
-    # url: jdbc:postgresql://localhost:5432/smart_retry
+    # url: jdbc:postgresql://localhost:5432/retry_task
     # username: postgres
     # password: postgres
     
     # Oracle配置示例
     # driver-class-name: oracle.jdbc.OracleDriver
-    # url: jdbc:oracle:thin:@localhost:1521:orcl
+    # url: jdbc:oracle:thin:@localhost:1521:retry_task
     # username: smart_retry
     # password: smart_retry
 
