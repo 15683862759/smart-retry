@@ -22,32 +22,38 @@ public class RetrySnapshot {
             return;
         }
         MethodChain methodChainModel = METHOD_CHAIN_THREAD_LOCAL.get();
-        MethodChain preTail = methodChainModel;
-        while (methodChainModel != null) {
-            if (methodChainModel.getMethod().equals(method)) {
-                break;
+        MethodChain preTail = null;
+        MethodChain current = methodChainModel;
+        MethodChain matched = null;
+        MethodChain matchedPre = null;
+        while (current != null) {
+            if (method.equals(current.getMethod())) {
+                matched = current;
+                matchedPre = preTail;
             }
-            preTail = methodChainModel;
-            methodChainModel = methodChainModel.getNext();
+            preTail = current;
+            current = current.getNext();
         }
-        if (preTail != null) {
-            preTail.setNext(null);
-            //preTail.setTail(true);
+        if (matched == null) {
+            return;
         }
-        if (methodChainModel.isHeader()) {
+        if (matchedPre == null) {
             METHOD_CHAIN_THREAD_LOCAL.remove();
+            return;
         }
+        matchedPre.setNext(null);
     }
 
     public static MethodChain getChainByMethod(Method method) {
         MethodChain methodChainModel = METHOD_CHAIN_THREAD_LOCAL.get();
+        MethodChain matched = null;
         while (methodChainModel != null) {
-            if (methodChainModel.getMethod().equals(method)) {
-                break;
+            if (method.equals(methodChainModel.getMethod())) {
+                matched = methodChainModel;
             }
             methodChainModel = methodChainModel.getNext();
         }
-        return methodChainModel;
+        return matched;
     }
 
     public static synchronized void setInterceptorChain(MethodChain chainModel) {

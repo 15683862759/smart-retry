@@ -100,7 +100,7 @@ public class DefaultRetryCondition implements RetryCondition {
     private boolean checkChainException() {
         boolean retryFlag = false;
         MethodChain methodChainModel = RetrySnapshot.getChainByMethod(retryAttemptContext.getMethod());
-        if (methodChainModel.isRetry() && methodChainModel.isTail()) {
+        if (methodChainModel != null && methodChainModel.isRetry() && methodChainModel.isTail()) {
             retryFlag = true;
         }
         return retryFlag;
