@@ -14,6 +14,7 @@ import com.smart.retry.web.dto.Result;
 import com.smart.retry.web.dto.task.TaskCreateRequest;
 import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.dao.WebRetryShardingDao;
+import com.smart.retry.web.entity.RetryTaskDO;
 import com.smart.retry.web.dto.task.TaskUpdateRequest;
 import com.smart.retry.web.exception.BusinessException;
 import com.smart.retry.web.exception.GlobalExceptionHandler;
@@ -22,6 +23,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -334,6 +336,69 @@ public class RetryDefectRegressionTest extends AbstractTest {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM retry_task WHERE id = ?", Integer.class, taskId);
         Assert.assertEquals(Integer.valueOf(1), count);
+    }
+
+    @Test
+    public void testUpdateTaskRejectsConcurrentRunningTransition() {
+        WebRetryTaskDao taskDao = Mockito.mock(WebRetryTaskDao.class);
+        RetryTaskService service = newService(taskDao);
+        RetryTaskDO task = new RetryTaskDO();
+        task.setId(1L);
+        task.setStatus(RetryTaskStatus.WAITING.getCode());
+        Mockito.when(taskDao.selectById(1L)).thenReturn(task);
+        Mockito.when(taskDao.update(task)).thenReturn(0);
+
+        TaskUpdateRequest request = new TaskUpdateRequest();
+        request.setId(1L);
+        request.setRetryNum(1);
+
+        try {
+            service.updateTask(request);
+            Assert.fail("并发进入执行中时更新应返回业务失败");
+        } catch (BusinessException expected) {
+            Assert.assertEquals("任务状态已变化，更新失败", expected.getMessage());
+        }
+    }
+
+    @Test
+    public void testDeleteTaskRejectsConcurrentRunningTransition() {
+        WebRetryTaskDao taskDao = Mockito.mock(WebRetryTaskDao.class);
+        RetryTaskService service = newService(taskDao);
+        RetryTaskDO task = new RetryTaskDO();
+        task.setId(1L);
+        task.setStatus(RetryTaskStatus.WAITING.getCode());
+        Mockito.when(taskDao.selectById(1L)).thenReturn(task);
+        Mockito.when(taskDao.deleteById(1L)).thenReturn(0);
+
+        try {
+            service.deleteTask(1L);
+            Assert.fail("并发进入执行中时删除应返回业务失败");
+        } catch (BusinessException expected) {
+            Assert.assertEquals("任务状态已变化，删除失败", expected.getMessage());
+        }
+    }
+
+    @Test
+    public void testBatchDeleteTasksRejectsConcurrentPartialDelete() {
+        WebRetryTaskDao taskDao = Mockito.mock(WebRetryTaskDao.class);
+        RetryTaskService service = newService(taskDao);
+        List<Long> ids = java.util.Arrays.asList(1L, 2L);
+        Mockito.when(taskDao.selectById(1L)).thenReturn(null);
+        Mockito.when(taskDao.selectById(2L)).thenReturn(null);
+        Mockito.when(taskDao.batchDeleteByIds(ids)).thenReturn(1);
+
+        try {
+            service.batchDeleteTasks(ids);
+            Assert.fail("批量删除发生部分失败时应返回业务失败");
+        } catch (BusinessException expected) {
+            Assert.assertEquals("部分任务状态已变化，删除失败", expected.getMessage());
+        }
+    }
+
+    private RetryTaskService newService(WebRetryTaskDao taskDao) {
+        WebRetryShardingDao shardingDao = Mockito.mock(WebRetryShardingDao.class);
+        ObjectProvider<RetryTaskEnqueuer> enqueuerProvider = Mockito.mock(ObjectProvider.class);
+        return new RetryTaskService(taskDao, shardingDao, enqueuerProvider);
     }
 
     private long saveTask(String uniqueKey) {

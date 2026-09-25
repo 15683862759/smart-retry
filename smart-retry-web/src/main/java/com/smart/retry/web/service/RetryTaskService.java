@@ -206,7 +206,10 @@ public class RetryTaskService {
             throw new BusinessException("任务正在执行中，无法保存");
         }
         
-        webRetryTaskDao.update(taskDO);
+        int updated = webRetryTaskDao.update(taskDO);
+        if (updated == 0) {
+            throw new BusinessException("任务状态已变化，更新失败");
+        }
         log.info("[TaskService#updateTask]更新任务成功，id: {}", request.getId());
     }
     
@@ -225,7 +228,10 @@ public class RetryTaskService {
             throw new BusinessException("执行中的任务无法删除");
         }
         
-        webRetryTaskDao.deleteById(id);
+        int deleted = webRetryTaskDao.deleteById(id);
+        if (deleted == 0) {
+            throw new BusinessException("任务状态已变化，删除失败");
+        }
         log.info("[TaskService#deleteTask]删除任务成功，id: {}", id);
     }
     
@@ -246,8 +252,12 @@ public class RetryTaskService {
             }
         }
         
-        webRetryTaskDao.batchDeleteByIds(ids);
-        log.info("[TaskService#batchDeleteTasks]批量删除任务成功，数量: {}", ids.size());
+        List<Long> distinctIds = new ArrayList<>(new LinkedHashSet<>(ids));
+        int deleted = webRetryTaskDao.batchDeleteByIds(distinctIds);
+        if (deleted != distinctIds.size()) {
+            throw new BusinessException("部分任务状态已变化，删除失败");
+        }
+        log.info("[TaskService#batchDeleteTasks]批量删除任务成功，数量: {}", distinctIds.size());
     }
     
     /**
