@@ -18,7 +18,7 @@ public class MethodRetryTarget {
 
     @RetryOnMethod(
             maxAttempt = 3,
-            firstDelaySecond = 1,
+            firstDelaySecond = 2,
             intervalSecond = 1,
             retryTaskNotifies = {MethodRetryNotify.class}
     )

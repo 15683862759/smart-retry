@@ -10,6 +10,15 @@ import org.springframework.test.context.junit4.SpringRunner;
  * @Description: TODO
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest(classes = SmartTestApplication.class)
+@SpringBootTest(
+        classes = SmartTestApplication.class,
+        properties = {
+                "server.port=7099",
+                "spring.smart-retry.taskFindInterval=1",
+                "spring.smart-retry.health.interval=1",
+                "spring.smart-retry.health.timeout=2",
+                "spring.smart-retry.health.scanInterval=1"
+        }
+)
 public abstract class AbstractTest {
 }
