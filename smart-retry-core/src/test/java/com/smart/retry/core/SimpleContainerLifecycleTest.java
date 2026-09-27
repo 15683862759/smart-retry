@@ -175,9 +175,10 @@ public class SimpleContainerLifecycleTest {
                 new SimpleContainer(new TestConfiguration(fixedTaskAccess(dbTask)), configure);
         ShardingContextHolder.initShardingIndex(Collections.singletonList(1L));
 
-        dbTask.setOriginRetryNum(null);
-        Assertions.assertFalse(container.validateTaskInDB(dbTask),
-                "originRetryNum 缺失时不应执行，否则策略计算会反复 NPE");
+        try {
+            dbTask.setOriginRetryNum(null);
+            Assertions.assertFalse(container.validateTaskInDB(dbTask),
+                    "originRetryNum 缺失时不应执行，否则策略计算会反复 NPE");
 
         dbTask.setOriginRetryNum(3);
         dbTask.setIntervalSecond(0);
@@ -188,10 +189,52 @@ public class SimpleContainerLifecycleTest {
         Assertions.assertFalse(container.validateTaskInDB(dbTask),
                 "intervalSecond 缺失时不应执行，否则策略计算会 NPE");
 
-        dbTask.setIntervalSecond(60);
-        dbTask.setNextPlanTime(null);
-        Assertions.assertFalse(container.validateTaskInDB(dbTask),
-                "nextPlanTime 缺失时不应执行，否则任务会被立即重新调度");
+            dbTask.setIntervalSecond(60);
+            dbTask.setNextPlanTime(null);
+            Assertions.assertFalse(container.validateTaskInDB(dbTask),
+                    "nextPlanTime 缺失时不应执行，否则任务会被立即重新调度");
+        } finally {
+            container.destroy();
+        }
+    }
+
+    @Test
+    void validateTaskInDBRefreshesStaleInMemoryTaskBeforeExecution() {
+        RetryTask dbTask = validWaitingTask();
+        dbTask.setTaskCode("db-task-code");
+        dbTask.setUniqueKey("db-unique-key");
+
+        RetryTask staleTask = new RetryTask();
+        staleTask.setId(dbTask.getId());
+        staleTask.setTaskCode("stale-task-code");
+        staleTask.setUniqueKey("stale-unique-key");
+
+        SmartExecutorConfigure configure = new SmartExecutorConfigure();
+        configure.setTaskFindInterval(1);
+        SimpleContainer container =
+                new SimpleContainer(new TestConfiguration(fixedTaskAccess(dbTask)), configure);
+        ShardingContextHolder.initShardingIndex(Collections.singletonList(1L));
+
+        try {
+            Assertions.assertTrue(container.validateTaskInDB(staleTask),
+                    "数据库中的合法任务应允许执行");
+            Assertions.assertEquals("db-task-code", staleTask.getTaskCode(),
+                    "执行必须使用数据库最新 taskCode，避免使用过期任务定义");
+            Assertions.assertEquals("db-unique-key", staleTask.getUniqueKey(),
+                    "执行后释放去重键必须使用数据库最新 uniqueKey");
+            Assertions.assertEquals(dbTask.getRetryNum(), staleTask.getRetryNum(),
+                    "重试次数必须来自数据库快照，避免旧对象覆盖最新扣减结果");
+            Assertions.assertEquals(dbTask.getOriginRetryNum(), staleTask.getOriginRetryNum(),
+                    "策略计算必须使用数据库最新原始重试次数");
+            Assertions.assertEquals(dbTask.getIntervalSecond(), staleTask.getIntervalSecond(),
+                    "策略计算必须使用数据库最新间隔");
+            Assertions.assertEquals(dbTask.getNextPlanTime(), staleTask.getNextPlanTime(),
+                    "策略计算必须使用数据库最新下次执行时间");
+            Assertions.assertEquals(dbTask.getShardingKey(), staleTask.getShardingKey(),
+                    "认领任务必须使用数据库最新分片");
+        } finally {
+            container.destroy();
+        }
     }
 
     @Test

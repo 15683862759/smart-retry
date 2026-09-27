@@ -15,6 +15,7 @@ import com.smart.retry.common.model.TaskExecutionResult;
 import com.smart.retry.core.cache.RetryCache;
 import com.smart.retry.core.config.SmartExecutorConfigure;
 import com.smart.retry.core.innovation.DefaultInnovation;
+import org.springframework.beans.BeanUtils;
 import org.slf4j.Logger;
 import org.slf4j.MDC;
 import org.slf4j.LoggerFactory;
@@ -545,6 +546,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             if (shardingIndexList == null || !shardingIndexList.contains(dbTask.getShardingKey())) {
                 return false;
             }
+            // 队列中的任务可能已停留多个扫描周期；执行必须以数据库快照为准，
+            // 避免旧 retry_num/策略字段/uniqueKey 覆盖其他实例或管理端更新后的数据。
+            BeanUtils.copyProperties(dbTask, task);
             return true;
         } catch (Exception e) {
             LOGGER.warn("[validateTaskInDB#validateTaskInDB] check failed for task:{}", task.getId(), e);
