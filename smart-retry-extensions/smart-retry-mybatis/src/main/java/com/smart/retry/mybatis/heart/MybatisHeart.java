@@ -162,7 +162,7 @@ public class MybatisHeart implements RetryTaskHeart {
      * 启动心跳后台线程。重复调用时保留首个线程，避免产生多个心跳循环。
      */
     public synchronized void heartBeat() {
-        if (heartbeatThread != null) {
+        if (isThreadAlive(heartbeatThread)) {
             return;
         }
         Thread thread = new Thread(new HeartbeatTask());
@@ -178,7 +178,7 @@ public class MybatisHeart implements RetryTaskHeart {
      */
     @Override
     public synchronized void scrambleDeadSharding() {
-        if (scrambleDeadShardingThread != null) {
+        if (isThreadAlive(scrambleDeadShardingThread)) {
             return;
         }
         Thread thread = new Thread(new ScrambleDeadShardingTask());
@@ -194,14 +194,16 @@ public class MybatisHeart implements RetryTaskHeart {
     @Override
     public synchronized void stop() {
         stopThread(heartbeatThread);
-        heartbeatThread = null;
         stopThread(scrambleDeadShardingThread);
-        scrambleDeadShardingThread = null;
     }
 
     private void stopThread(Thread thread) {
         if (thread != null) {
             thread.interrupt();
         }
+    }
+
+    private boolean isThreadAlive(Thread thread) {
+        return thread != null && thread.isAlive();
     }
 }
