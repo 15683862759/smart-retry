@@ -17,6 +17,9 @@ import org.springframework.beans.factory.ObjectProvider;
 
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -161,6 +164,77 @@ public class RetryTaskServiceTest {
             Assert.assertEquals(Integer.valueOf(400), e.getCode());
             Assert.assertEquals("相同参数的活跃任务已存在", e.getMessage());
         }
+    }
+
+    @Test
+    public void batchDeleteTasksRejectsOversizedRequestBeforeDaoAccess() {
+        AtomicInteger selectCount = new AtomicInteger();
+        AtomicInteger batchDeleteCount = new AtomicInteger();
+        WebRetryTaskDao taskDao = (WebRetryTaskDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryTaskDao.class},
+                (proxy, method, args) -> {
+                    if ("selectById".equals(method.getName())) {
+                        selectCount.incrementAndGet();
+                    } else if ("batchDeleteByIds".equals(method.getName())) {
+                        batchDeleteCount.incrementAndGet();
+                    }
+                    return null;
+                });
+        WebRetryShardingDao shardingDao = (WebRetryShardingDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryShardingDao.class},
+                (proxy, method, args) -> null);
+        ObjectProvider<RetryTaskEnqueuer> enqueuerProvider = (ObjectProvider<RetryTaskEnqueuer>) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{ObjectProvider.class},
+                (proxy, method, args) -> null);
+
+        Long[] ids = new Long[101];
+        Arrays.fill(ids, 1L);
+
+        try {
+            new RetryTaskService(taskDao, shardingDao, enqueuerProvider)
+                    .batchDeleteTasks(Arrays.asList(ids));
+            Assert.fail("超过单批上限的请求应直接失败");
+        } catch (BusinessException e) {
+            Assert.assertEquals(Integer.valueOf(400), e.getCode());
+            Assert.assertEquals("单次最多批量删除100个任务", e.getMessage());
+        }
+        Assert.assertEquals(0, selectCount.get());
+        Assert.assertEquals(0, batchDeleteCount.get());
+    }
+
+    @Test
+    public void batchDeleteTasksRejectsNullElementBeforeDaoAccess() {
+        AtomicInteger selectCount = new AtomicInteger();
+        WebRetryTaskDao taskDao = (WebRetryTaskDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryTaskDao.class},
+                (proxy, method, args) -> {
+                    if ("selectById".equals(method.getName())) {
+                        selectCount.incrementAndGet();
+                    }
+                    return null;
+                });
+        WebRetryShardingDao shardingDao = (WebRetryShardingDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryShardingDao.class},
+                (proxy, method, args) -> null);
+        ObjectProvider<RetryTaskEnqueuer> enqueuerProvider = (ObjectProvider<RetryTaskEnqueuer>) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{ObjectProvider.class},
+                (proxy, method, args) -> null);
+
+        try {
+            new RetryTaskService(taskDao, shardingDao, enqueuerProvider)
+                    .batchDeleteTasks(Collections.singletonList(null));
+            Assert.fail("空任务 ID 应直接失败");
+        } catch (BusinessException e) {
+            Assert.assertEquals(Integer.valueOf(400), e.getCode());
+            Assert.assertEquals("任务ID不能为空", e.getMessage());
+        }
+        Assert.assertEquals(0, selectCount.get());
     }
 
     private WebRetryShardingDao proxyShardingDao(List<RetryShardingDO> firstPage,

@@ -39,6 +39,7 @@ import java.util.*;
 public class RetryTaskService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RetryTaskService.class);
+    private static final int MAX_BATCH_DELETE_SIZE = 100;
     
     private final WebRetryTaskDao webRetryTaskDao;
     private final WebRetryShardingDao webRetryShardingDao;
@@ -296,6 +297,16 @@ public class RetryTaskService {
     public void batchDeleteTasks(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return;
+        }
+
+        // 请求在进入数据库前必须完成边界校验，避免超大 ID 列表生成超长 IN SQL。
+        for (Long id : ids) {
+            if (id == null) {
+                throw new BusinessException(400, "任务ID不能为空");
+            }
+        }
+        if (ids.size() > MAX_BATCH_DELETE_SIZE) {
+            throw new BusinessException(400, "单次最多批量删除100个任务");
         }
         
         // 检查是否有执行中的任务
