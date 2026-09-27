@@ -535,6 +535,12 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
             if (dbTask.getRetryNum() == null || dbTask.getRetryNum() <= 0) {
                 return false;
             }
+            if (dbTask.getOriginRetryNum() == null
+                    || dbTask.getIntervalSecond() == null
+                    || dbTask.getIntervalSecond() <= 0
+                    || dbTask.getNextPlanTime() == null) {
+                return false;
+            }
             List<Long> shardingIndexList = ShardingContextHolder.shardingIndex();
             if (shardingIndexList == null || !shardingIndexList.contains(dbTask.getShardingKey())) {
                 return false;

@@ -3,6 +3,7 @@ package com.smart.retry.core;
 import com.smart.retry.common.RetryConfiguration;
 import com.smart.retry.common.RetryTaskAccess;
 import com.smart.retry.common.SmartRetryRunFlag;
+import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.common.identifier.Identifier;
 import com.smart.retry.common.model.RetryTask;
 import com.smart.retry.common.model.RetryTaskObject;
@@ -27,6 +28,7 @@ public class SimpleContainerLifecycleTest {
     @AfterEach
     void tearDown() {
         SmartRetryRunFlag.setFlag(false);
+        ShardingContextHolder.initShardingIndex(Collections.emptyList());
         RetryCache.clear();
         RetryTaskCache.clear();
     }
@@ -165,6 +167,34 @@ public class SimpleContainerLifecycleTest {
     }
 
     @Test
+    void validateTaskInDBRejectsTaskMissingStrategyExecutionFields() {
+        RetryTask dbTask = validWaitingTask();
+        SmartExecutorConfigure configure = new SmartExecutorConfigure();
+        configure.setTaskFindInterval(1);
+        SimpleContainer container =
+                new SimpleContainer(new TestConfiguration(fixedTaskAccess(dbTask)), configure);
+        ShardingContextHolder.initShardingIndex(Collections.singletonList(1L));
+
+        dbTask.setOriginRetryNum(null);
+        Assertions.assertFalse(container.validateTaskInDB(dbTask),
+                "originRetryNum 缺失时不应执行，否则策略计算会反复 NPE");
+
+        dbTask.setOriginRetryNum(3);
+        dbTask.setIntervalSecond(0);
+        Assertions.assertFalse(container.validateTaskInDB(dbTask),
+                "intervalSecond 非正数时不应执行，否则退避计算会产生非法间隔");
+
+        dbTask.setIntervalSecond(null);
+        Assertions.assertFalse(container.validateTaskInDB(dbTask),
+                "intervalSecond 缺失时不应执行，否则策略计算会 NPE");
+
+        dbTask.setIntervalSecond(60);
+        dbTask.setNextPlanTime(null);
+        Assertions.assertFalse(container.validateTaskInDB(dbTask),
+                "nextPlanTime 缺失时不应执行，否则任务会被立即重新调度");
+    }
+
+    @Test
     void destroyOneContainerKeepsGlobalCachesForRunningContainer() {
         String taskCode = "surviving-container-task";
         String taskKey = taskCode + "-task";
@@ -224,6 +254,30 @@ public class SimpleContainerLifecycleTest {
                         return Collections.emptyList();
                     }
                     return null;
+                });
+    }
+
+    private static RetryTask validWaitingTask() {
+        RetryTask task = new RetryTask();
+        task.setId(1L);
+        task.setStatus(RetryTaskStatus.WAITING.getCode());
+        task.setRetryNum(1);
+        task.setOriginRetryNum(3);
+        task.setIntervalSecond(60);
+        task.setNextPlanTime(new Date());
+        task.setShardingKey(1L);
+        return task;
+    }
+
+    private static RetryTaskAccess fixedTaskAccess(RetryTask task) {
+        return (RetryTaskAccess) Proxy.newProxyInstance(
+                RetryTaskAccess.class.getClassLoader(),
+                new Class<?>[]{RetryTaskAccess.class},
+                (proxy, method, args) -> {
+                    if ("getRetryTask".equals(method.getName())) {
+                        return task;
+                    }
+                    throw new UnsupportedOperationException(method.getName());
                 });
     }
 
