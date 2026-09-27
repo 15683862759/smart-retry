@@ -16,6 +16,7 @@ import com.smart.retry.core.cache.RetryCache;
 import com.smart.retry.core.config.SmartExecutorConfigure;
 import com.smart.retry.core.innovation.DefaultInnovation;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.DisposableBean;
 import org.slf4j.Logger;
 import org.slf4j.MDC;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,7 @@ import java.util.concurrent.*;
  * @Description: 重试调度容器。维护数据库兜底扫描、DelayQueue 精准调度、
  * 线程池消费、死信检测和历史清理，是多实例并发下任务执行的核心引擎。
  */
-public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer {
+public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, DisposableBean {
 
     private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(SimpleContainer.class);
 

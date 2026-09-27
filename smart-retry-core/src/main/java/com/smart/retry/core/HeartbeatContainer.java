@@ -2,13 +2,14 @@ package com.smart.retry.core;
 
 import com.smart.retry.common.RetryContainer;
 import com.smart.retry.common.RetryTaskHeart;
+import org.springframework.beans.factory.DisposableBean;
 /**
  * @Author xiaoqiang
  * @Version HeartbeatContainer.java, v 0.1 2025年02月16日 10:50 xiaoqiang
  * @Description: 心跳容器。将实例初始化、心跳上报和死分片接管流程
  * 纳入 RetryContainer 统一生命周期。
  */
-public class HeartbeatContainer implements RetryContainer {
+public class HeartbeatContainer implements RetryContainer, DisposableBean {
 
 
     private RetryTaskHeart heart;
