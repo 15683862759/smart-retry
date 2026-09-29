@@ -1,6 +1,7 @@
 package com.smart.retry.web.service;
 
 import com.smart.retry.common.RetryTaskEnqueuer;
+import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.web.dao.WebRetryShardingDao;
 import com.smart.retry.web.dao.WebRetryTaskDao;
 import com.smart.retry.web.dto.task.TaskQueryRequest;
@@ -164,6 +165,51 @@ public class RetryTaskServiceTest {
             Assert.assertEquals(Integer.valueOf(400), e.getCode());
             Assert.assertEquals("相同参数的活跃任务已存在", e.getMessage());
         }
+    }
+
+    @Test
+    public void updateTaskRejectsWaitingResetWhenRetryNumExhausted() {
+        RetryTaskDO task = new RetryTaskDO();
+        task.setTaskCode("exhausted-task");
+        task.setParameters("{}");
+        task.setStatus(RetryTaskStatus.SUCCESS.getCode());
+        task.setRetryNum(0);
+        task.setOriginRetryNum(0);
+        AtomicInteger updateCount = new AtomicInteger();
+        WebRetryTaskDao taskDao = (WebRetryTaskDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryTaskDao.class},
+                (proxy, method, args) -> {
+                    if ("selectById".equals(method.getName())) {
+                        return task;
+                    }
+                    if ("update".equals(method.getName())) {
+                        updateCount.incrementAndGet();
+                        return 1;
+                    }
+                    return null;
+                });
+        WebRetryShardingDao shardingDao = (WebRetryShardingDao) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{WebRetryShardingDao.class},
+                (proxy, method, args) -> null);
+        ObjectProvider<RetryTaskEnqueuer> enqueuerProvider = (ObjectProvider<RetryTaskEnqueuer>) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{ObjectProvider.class},
+                (proxy, method, args) -> null);
+
+        TaskUpdateRequest request = new TaskUpdateRequest();
+        request.setId(1L);
+        request.setStatus(RetryTaskStatus.WAITING.getCode());
+
+        try {
+            new RetryTaskService(taskDao, shardingDao, enqueuerProvider).updateTask(request);
+            Assert.fail("剩余次数耗尽时重置待执行应失败");
+        } catch (BusinessException e) {
+            Assert.assertEquals(Integer.valueOf(400), e.getCode());
+            Assert.assertEquals("重试次数已耗尽，请设置新的重试次数", e.getMessage());
+        }
+        Assert.assertEquals(0, updateCount.get());
     }
 
     @Test

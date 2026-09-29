@@ -241,6 +241,10 @@ public class RetryTaskService {
                     && !RetryTaskStatus.SUCCESS.getCode().equals(currentStatus)) {
                     throw new BusinessException("只有失败或成功的任务才能重置为待执行");
                 }
+                // 调度器只认领剩余次数大于 0 的任务，耗尽后必须显式补充次数。
+                if (taskDO.getRetryNum() <= 0) {
+                    throw new BusinessException(400, "重试次数已耗尽，请设置新的重试次数");
+                }
             }
             
             taskDO.setStatus(newStatus);
