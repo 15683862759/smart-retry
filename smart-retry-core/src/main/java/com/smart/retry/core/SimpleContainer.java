@@ -582,7 +582,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
                         }
 
                         CompletableFuture.runAsync(
-                                new ConsumerTask(task, retryConfiguration, true),
+                                new ConsumerTask(task, retryConfiguration, TaskExecutionMode.SCHEDULED),
                                 consumerExecutor
                         );
                     }
@@ -807,7 +807,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
             return;
         }
 
-        CompletableFuture<Void> future = CompletableFuture.runAsync(new ConsumerTask(retryTask, retryConfiguration), consumerExecutor);
+        CompletableFuture<Void> future = CompletableFuture.runAsync(
+                new ConsumerTask(retryTask, retryConfiguration, TaskExecutionMode.MANUAL),
+                consumerExecutor);
     }
 
     /**
@@ -858,7 +860,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
             return null;
         }
         // 仅执行一次，后续重试由 afterExecute 放入 delayQueue 异步推进
-        ConsumerTask task = new ConsumerTask(retryTask, retryConfiguration);
+        ConsumerTask task = new ConsumerTask(retryTask, retryConfiguration, TaskExecutionMode.MANUAL);
         task.run();
         return task.getResult();
     }
@@ -893,17 +895,36 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
      *
      * @param task 已刷新为数据库最新快照的任务
      */
-    private synchronized void deferScheduledTask(RetryTask task) {
+    private synchronized void requeueOrReleaseTask(RetryTask task) {
         String key = getUniqueKey(task);
-        if (!containerRunning) {
-            RetryTaskCache.unmark(key);
+        boolean schedulable = containerRunning && isInWindow(task.getNextPlanTime());
+        if (schedulable) {
+            delayQueue.put(new ScheduledTask(task));
             return;
         }
-        if (!isInWindow(task.getNextPlanTime())) {
-            RetryTaskCache.unmark(key);
-            return;
+        RetryTaskCache.unmark(key);
+    }
+
+    /**
+     * 消费任务的执行来源。
+     */
+    private enum TaskExecutionMode {
+
+        /** DelayQueue 自动调度，必须尊重数据库中的最新执行时间。 */
+        SCHEDULED(true),
+
+        /** 管理端手动触发，保留立即执行一次的语义。 */
+        MANUAL(false);
+
+        private final boolean honorsNextPlanTime;
+
+        TaskExecutionMode(boolean honorsNextPlanTime) {
+            this.honorsNextPlanTime = honorsNextPlanTime;
         }
-        delayQueue.put(new ScheduledTask(task));
+
+        private boolean honorsNextPlanTime() {
+            return honorsNextPlanTime;
+        }
     }
 
     /**
@@ -926,20 +947,16 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
 
         private final RetryTask retryTask;
         private final RetryConfiguration retryConfiguration;
-        private final boolean respectNextPlanTime;
+        private final TaskExecutionMode executionMode;
 
         /** run() 执行完毕后的结果；未执行（被校验/去重拒绝）时为 null */
         private volatile TaskExecutionResult result;
 
-        ConsumerTask(RetryTask retryTask, RetryConfiguration retryConfiguration) {
-            this(retryTask, retryConfiguration, false);
-        }
-
         ConsumerTask(RetryTask retryTask, RetryConfiguration retryConfiguration,
-                     boolean respectNextPlanTime) {
+                     TaskExecutionMode executionMode) {
             this.retryTask = retryTask;
             this.retryConfiguration = retryConfiguration;
-            this.respectNextPlanTime = respectNextPlanTime;
+            this.executionMode = executionMode;
         }
 
         @Override
@@ -952,9 +969,9 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
             }
             // 内存队列中的任务可能在等待期间被管理端延后。自动调度必须尊重数据库
             // 最新 nextPlanTime；手动触发保持“立即执行一次”语义，不受该时间限制。
-            if (respectNextPlanTime
+            if (executionMode.honorsNextPlanTime()
                     && retryTask.getNextPlanTime().getTime() > System.currentTimeMillis()) {
-                deferScheduledTask(retryTask);
+                requeueOrReleaseTask(retryTask);
                 this.result = null;
                 return;
             }

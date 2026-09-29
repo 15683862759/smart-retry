@@ -2,8 +2,8 @@ package com.smart.retry.core;
 
 import com.smart.retry.common.RetryConfiguration;
 import com.smart.retry.common.RetryTaskAccess;
-import com.smart.retry.common.SmartRetryRunFlag;
 import com.smart.retry.common.RetryListener;
+import com.smart.retry.common.SmartRetryRunFlag;
 import com.smart.retry.common.constant.ExecuteResultStatus;
 import com.smart.retry.common.constant.RetryTaskStatus;
 import com.smart.retry.common.constant.RetryTaskTypeEnum;
@@ -22,10 +22,10 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class SimpleContainerLifecycleTest {
 
@@ -273,11 +273,7 @@ public class SimpleContainerLifecycleTest {
             Assertions.assertTrue(container.enqueue(staleTask),
                     "过期内存快照应允许先进入调度队列");
 
-            long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(2);
-            while ((consumed.get() || RetryTaskCache.size() > 0)
-                    && System.currentTimeMillis() < deadline) {
-                TimeUnit.MILLISECONDS.sleep(20);
-            }
+            awaitTaskCacheRelease();
 
             Assertions.assertEquals(0, claimCount.get(),
                     "数据库 nextPlanTime 被延后时，自动调度不能按旧内存时间提前认领");
@@ -479,6 +475,13 @@ public class SimpleContainerLifecycleTest {
             TimeUnit.MILLISECONDS.sleep(50);
         }
         return producerThreadCount() == expected;
+    }
+
+    private static void awaitTaskCacheRelease() throws InterruptedException {
+        long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(2);
+        while (RetryTaskCache.size() > 0 && System.currentTimeMillis() < deadline) {
+            TimeUnit.MILLISECONDS.sleep(20);
+        }
     }
 
     private static long producerThreadCount() {
