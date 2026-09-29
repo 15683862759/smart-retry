@@ -3,7 +3,10 @@ package com.smart.retry.core;
 import com.smart.retry.common.RetryConfiguration;
 import com.smart.retry.common.RetryTaskAccess;
 import com.smart.retry.common.SmartRetryRunFlag;
+import com.smart.retry.common.RetryListener;
+import com.smart.retry.common.constant.ExecuteResultStatus;
 import com.smart.retry.common.constant.RetryTaskStatus;
+import com.smart.retry.common.constant.RetryTaskTypeEnum;
 import com.smart.retry.common.identifier.Identifier;
 import com.smart.retry.common.model.RetryTask;
 import com.smart.retry.common.model.RetryTaskObject;
@@ -20,6 +23,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -238,6 +242,53 @@ public class SimpleContainerLifecycleTest {
     }
 
     @Test
+    void scheduledTaskDelayedInDatabaseAfterEnqueueIsNotExecutedEarly() throws Exception {
+        AtomicBoolean consumed = new AtomicBoolean(false);
+        RetryTask staleTask = validWaitingTask();
+        staleTask.setTaskCode("delayed-after-enqueue-task");
+        staleTask.setUniqueKey("delayed-task");
+
+        RetryTask dbTask = validWaitingTask();
+        dbTask.setId(staleTask.getId());
+        dbTask.setTaskCode(staleTask.getTaskCode());
+        dbTask.setUniqueKey(staleTask.getUniqueKey());
+        dbTask.setNextPlanTime(new Date(System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(5)));
+
+        AtomicInteger claimCount = new AtomicInteger();
+        RetryTaskAccess taskAccess = claimingTaskAccess(dbTask, claimCount);
+        RetryCache.put(staleTask.getTaskCode(), RetryTaskObject.of()
+                .withTaskCode(staleTask.getTaskCode())
+                .withBeanObj((RetryListener<Object>) parameter -> {
+                    consumed.set(true);
+                    return ExecuteResultStatus.SUCCESS;
+                })
+                .withRetryType(RetryTaskTypeEnum.CLASS));
+
+        SmartExecutorConfigure configure = new SmartExecutorConfigure();
+        configure.setTaskFindInterval(1);
+        SimpleContainer container = new SimpleContainer(new TestConfiguration(taskAccess), configure);
+        ShardingContextHolder.initShardingIndex(Collections.singletonList(1L));
+        container.start();
+        try {
+            Assertions.assertTrue(container.enqueue(staleTask),
+                    "过期内存快照应允许先进入调度队列");
+
+            long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(2);
+            while ((consumed.get() || RetryTaskCache.size() > 0)
+                    && System.currentTimeMillis() < deadline) {
+                TimeUnit.MILLISECONDS.sleep(20);
+            }
+
+            Assertions.assertEquals(0, claimCount.get(),
+                    "数据库 nextPlanTime 被延后时，自动调度不能按旧内存时间提前认领");
+            Assertions.assertFalse(consumed.get(),
+                    "数据库 nextPlanTime 被延后时，业务方法不能被提前执行");
+        } finally {
+            container.destroy();
+        }
+    }
+
+    @Test
     void destroyOneContainerKeepsGlobalCachesForRunningContainer() {
         String taskCode = "surviving-container-task";
         String taskKey = taskCode + "-task";
@@ -319,6 +370,31 @@ public class SimpleContainerLifecycleTest {
                 (proxy, method, args) -> {
                     if ("getRetryTask".equals(method.getName())) {
                         return task;
+                    }
+                    throw new UnsupportedOperationException(method.getName());
+                });
+    }
+
+    private static RetryTaskAccess claimingTaskAccess(RetryTask task, AtomicInteger claimCount) {
+        return (RetryTaskAccess) Proxy.newProxyInstance(
+                RetryTaskAccess.class.getClassLoader(),
+                new Class<?>[]{RetryTaskAccess.class},
+                (proxy, method, args) -> {
+                    if ("getRetryTask".equals(method.getName())) {
+                        return task;
+                    }
+                    if ("listRetryTask".equals(method.getName())) {
+                        return Collections.emptyList();
+                    }
+                    if ("listDeadTask".equals(method.getName())) {
+                        return Collections.emptyList();
+                    }
+                    if ("claimRetryTask".equals(method.getName())) {
+                        claimCount.incrementAndGet();
+                        return 1;
+                    }
+                    if ("markRetryTaskTerminal".equals(method.getName())) {
+                        return 1;
                     }
                     throw new UnsupportedOperationException(method.getName());
                 });

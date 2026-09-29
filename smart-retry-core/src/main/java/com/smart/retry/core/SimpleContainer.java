@@ -582,7 +582,7 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
                         }
 
                         CompletableFuture.runAsync(
-                                new ConsumerTask(task, retryConfiguration),
+                                new ConsumerTask(task, retryConfiguration, true),
                                 consumerExecutor
                         );
                     }
@@ -884,6 +884,29 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
     }
 
     /**
+     * 自动调度发现数据库已把任务延后时的处理。
+     *
+     * <p>实现过程：
+     * 1. 新执行时间仍在预加载窗口内，保留内存占位并按新时间重新进入 DelayQueue；
+     * 2. 新执行时间超出窗口，释放占位并交给 Producer 后续扫描；
+     * 3. 容器已停止时释放占位，避免停机后残留内存 key。
+     *
+     * @param task 已刷新为数据库最新快照的任务
+     */
+    private synchronized void deferScheduledTask(RetryTask task) {
+        String key = getUniqueKey(task);
+        if (!containerRunning) {
+            RetryTaskCache.unmark(key);
+            return;
+        }
+        if (!isInWindow(task.getNextPlanTime())) {
+            RetryTaskCache.unmark(key);
+            return;
+        }
+        delayQueue.put(new ScheduledTask(task));
+    }
+
+    /**
      * 单次执行任务消费者。
      *
      * <p>只执行一轮：DB 校验 → 反射调用 → 回调 {@link SimpleContainer#afterExecute}。
@@ -903,13 +926,20 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
 
         private final RetryTask retryTask;
         private final RetryConfiguration retryConfiguration;
+        private final boolean respectNextPlanTime;
 
         /** run() 执行完毕后的结果；未执行（被校验/去重拒绝）时为 null */
         private volatile TaskExecutionResult result;
 
         ConsumerTask(RetryTask retryTask, RetryConfiguration retryConfiguration) {
+            this(retryTask, retryConfiguration, false);
+        }
+
+        ConsumerTask(RetryTask retryTask, RetryConfiguration retryConfiguration,
+                     boolean respectNextPlanTime) {
             this.retryTask = retryTask;
             this.retryConfiguration = retryConfiguration;
+            this.respectNextPlanTime = respectNextPlanTime;
         }
 
         @Override
@@ -917,6 +947,14 @@ public class SimpleContainer implements RetryContainer, RetryTaskEnqueuer, Dispo
             // 1. DB 校验：只放行 WAITING/FAIL + retryNum>0 + 分片归属
             if (!validateTaskInDB(retryTask)) {
                 RetryTaskCache.unmark(getUniqueKey(retryTask));
+                this.result = null;
+                return;
+            }
+            // 内存队列中的任务可能在等待期间被管理端延后。自动调度必须尊重数据库
+            // 最新 nextPlanTime；手动触发保持“立即执行一次”语义，不受该时间限制。
+            if (respectNextPlanTime
+                    && retryTask.getNextPlanTime().getTime() > System.currentTimeMillis()) {
+                deferScheduledTask(retryTask);
                 this.result = null;
                 return;
             }
